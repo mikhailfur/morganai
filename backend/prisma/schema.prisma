@@ -1,0 +1,185 @@
+-- MorganAI Full Schema
+
+-- =====================================================
+-- Enums
+-- =====================================================
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum Visibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+enum MessageRole {
+  SYSTEM
+  USER
+  ASSISTANT
+}
+
+enum SubscriptionProvider {
+  STRIPE
+  TRIBUTE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PENDING
+}
+
+-- =====================================================
+-- User
+-- =====================================================
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  displayName   String?  @map("display_name")
+  avatarUrl     String?  @map("avatar_url")
+  role          UserRole @default(USER)
+
+  -- Premium status (denormalized for fast reads)
+  isPremium     Boolean  @default(false) @map("is_premium")
+  premiumUntil  DateTime? @map("premium_until")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  -- Relations
+  characters    Character[]
+  chatSessions  ChatSession[]
+  subscriptions Subscription[]
+  messages      Message[]      @ignore  -- if we ever want direct relation
+}
+
+-- =====================================================
+-- Character
+-- =====================================================
+
+model Character {
+  id            String   @id @default(uuid())
+  creatorId     String   @map("creator_id")
+  name          String
+  description   String   @db.Text
+  systemPrompt  String   @db.Text @map("system_prompt")
+  tags          String[]  -- e.g. ["SFW","Romantic","Cyberpunk"]
+  visibility    Visibility @default(PRIVATE)
+  avatarUrl     String?  @map("avatar_url")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  -- Relations
+  creator       User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  chatSessions  ChatSession[]
+}
+
+-- =====================================================
+-- ChatSession
+-- =====================================================
+
+model ChatSession {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  characterId   String   @map("character_id")
+  selectedModel String   @map("selected_model")  -- e.g. "anthropic/claude-3.5-sonnet"
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  -- Relations
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character     Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  messages      Message[]
+}
+
+-- =====================================================
+-- Message
+-- =====================================================
+
+model Message {
+  id            String   @id @default(uuid())
+  sessionId     String   @map("session_id")
+  role          MessageRole
+  content       String   @db.Text
+  audioUrl      String?  @map("audio_url")
+  modelUsed     String?  @map("model_used")   -- LLM model ID that generated this message
+  usageTokens   Int?     @map("usage_tokens") -- completion tokens (optional analytics)
+
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  -- Relations
+  session       ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+-- =====================================================
+-- Subscription (unified for Stripe & Tribute)
+-- =====================================================
+
+model Subscription {
+  id              String              @id @default(uuid())
+  userId          String              @map("user_id")
+  provider        SubscriptionProvider
+  providerSubId   String              @map("provider_sub_id")  -- Stripe sub ID or Tribute payment ID
+  status          SubscriptionStatus
+  planName        String?             @map("plan_name")
+  priceCents      Int?                @map("price_cents")     -- for analytics / display
+  currency        String?             @default("USD")
+  currentPeriodStart DateTime?        @map("current_period_start")
+  currentPeriodEnd   DateTime?        @map("current_period_end")
+
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  -- Relations
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([provider])
+  @@index([status])
+}
+
+-- =====================================================
+-- PlatformModel (admin-managed OpenRouter models)
+-- =====================================================
+
+model PlatformModel {
+  id            String   @id @default(uuid())
+  providerId    String   @unique @map("provider_id")  -- e.g. "anthropic/claude-3.5-sonnet"
+  displayName   String   @map("display_name")
+  description   String?
+  contextLength Int      @map("context_length")
+  isActive      Boolean  @default(true) @map("is_active")
+  isPremium     Boolean  @default(false) @map("is_premium")  -- only for premium users?
+  pricingMultiplier Decimal @default(1.0) @map("pricing_multiplier")  -- relative cost
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+}
+
+-- =====================================================
+-- AuditLog (optional but recommended for admin actions)
+-- =====================================================
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  actorId       String   @map("actor_id")       -- userId who performed action
+  action        String                         -- e.g. "USER_ROLE_CHANGED"
+  targetType    String   @map("target_type")  -- e.g. "User"
+  targetId      String   @map("target_id")
+  payload       Json?                          -- flexible context
+
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([actorId])
+  @@index([targetType, targetId])
+}
