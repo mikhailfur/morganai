@@ -12,6 +12,7 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+COPY tsconfig*.json ./
 RUN npm run build
 
 # Generate Prisma client
