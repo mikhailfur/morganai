@@ -42,7 +42,6 @@ export class AiService {
     try {
       const contents: GeminiContent[] = []
 
-      // Add system prompt as first message
       contents.push({
         role: 'user',
         parts: [{ text: systemPrompt }],
@@ -52,7 +51,6 @@ export class AiService {
         parts: [{ text: welcomeMessage }],
       })
 
-      // Add history
       for (const msg of history) {
         contents.push({
           role: msg.role === 'user' ? 'user' : 'model',
@@ -60,7 +58,6 @@ export class AiService {
         })
       }
 
-      // Add current message with optional image
       const userParts: GeminiPart[] = [{ text: userMessage }]
 
       if (imageUrl) {
@@ -110,7 +107,7 @@ export class AiService {
         throw new Error(`Gemini API error: ${error}`)
       }
 
-      const data = await response.json()
+      const data: any = await response.json()
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
 
       return { text }
@@ -122,7 +119,6 @@ export class AiService {
 
   async transcribeAudio(audioBuffer: Buffer): Promise<string> {
     try {
-      // Whisper API (OpenAI-compatible)
       const formData = new FormData()
       formData.append('file', new Blob([audioBuffer], { type: 'audio/webm' }), 'audio.webm')
       formData.append('model', 'whisper-1')
@@ -140,7 +136,7 @@ export class AiService {
         throw new Error(`Whisper API error: ${await response.text()}`)
       }
 
-      const data = await response.json()
+      const data: any = await response.json()
       return data.text
     } catch (error) {
       this.logger.error('Transcription error:', error)
@@ -150,7 +146,6 @@ export class AiService {
 
   async textToSpeech(text: string): Promise<Buffer> {
     try {
-      // MiniMax TTS API
       const response = await fetch('https://api.minimax.chat/v1/text2audio', {
         method: 'POST',
         headers: {
