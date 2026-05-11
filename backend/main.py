@@ -28,13 +28,13 @@ from app.services.telegram.handlers import (
     callback_handler,
     error_handler,
     group_message_handler,
-    menu_button_handler,
     premium_command,
     private_message_handler,
     profile_command,
     settings_command,
     start_command,
 )
+from app.tasks.proactive import run_proactive_cycle
 from app.tasks.tribute import check_tribute_subscriptions
 
 logging.basicConfig(
@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
     telegram_app.add_handler(CallbackQueryHandler(callback_handler))
 
     # Reply-кнопки меню (текстовые)
-    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler))
+    # Логика обработки кнопок меню интегрирована в private_message_handler
 
     # Все остальные приватные сообщения (фото, голос, текст)
     telegram_app.add_handler(
@@ -102,8 +102,10 @@ async def lifespan(app: FastAPI):
 
     app.state.telegram_app = telegram_app
 
-    # --- APScheduler (Tribute checker) ---
+    # --- APScheduler (Tribute checker + Proactive messages) ---
     scheduler = AsyncIOScheduler()
+    
+    # Проверка подписок Tribute каждые 5 минут
     scheduler.add_job(
         check_tribute_subscriptions,
         "interval",
@@ -111,8 +113,18 @@ async def lifespan(app: FastAPI):
         id="tribute_checker",
         replace_existing=True,
     )
+    
+    # Проактивные сообщения каждые 60 минут
+    scheduler.add_job(
+        run_proactive_cycle,
+        "interval",
+        minutes=60,
+        id="proactive_messages",
+        replace_existing=True,
+    )
+    
     scheduler.start()
-    logger.info("APScheduler запущен (Tribute checker каждые 5 мин)")
+    logger.info("APScheduler запущен (Tribute checker + Проактивные сообщения)")
     app.state.scheduler = scheduler
 
     yield

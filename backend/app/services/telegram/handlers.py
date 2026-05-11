@@ -102,9 +102,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Выбери персонажа, режим или напиши мне что-нибудь — я всегда на связи."
     )
 
+    webapp_url = getattr(settings, "WEBAPP_URL", settings.TELEGRAM_WEBHOOK_URL)
     webapp_button = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("🌐 Открыть Morgan AI WebApp", web_app=WebAppInfo(url=settings.TELEGRAM_WEBHOOK_URL))],
+            [InlineKeyboardButton("🌐 Открыть Morgan AI WebApp", web_app=WebAppInfo(url=webapp_url))],
             [InlineKeyboardButton("📖 Помощь", callback_data="help")],
         ]
     )
@@ -206,30 +207,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="HTML", reply_markup=ADMIN_MENU)
 
 
-# --- Обработка кнопок меню ---
-
-async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает текстовые кнопки ReplyKeyboardMarkup."""
-    if not update.message:
-        return
-    text = update.message.text
-
-    if text == "👤 Профиль":
-        await profile_command(update, context)
-    elif text == "⚙️ Настройки":
-        await settings_command(update, context)
-    elif text == "💎 Premium":
-        await premium_command(update, context)
-    elif text == "🎭 Персонажи":
-        await settings_command(update, context)
-    elif text == "📊 Статистика":
-        await admin_stats(update, context)
-    elif text == "🔧 Настройки бота":
-        await admin_config(update, context)
-    elif text == "⬅️ Назад":
-        await update.message.reply_text("Возврат в главное меню.", reply_markup=MAIN_MENU)
-
-
+# --- CallbackQuery ---
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Быстрая статистика в админ-меню."""
     async with AsyncSessionLocal() as session:
@@ -294,6 +272,31 @@ async def private_message_handler(update: Update, context: ContextTypes.DEFAULT_
     """Обработка личных сообщений: текст, фото, голос."""
     if not update.message or not update.effective_user:
         return
+
+    # Проверка кнопок меню (текстовые)
+    if update.message.text:
+        text = update.message.text
+        if text == "👤 Профиль":
+            await profile_command(update, context)
+            return
+        elif text == "⚙️ Настройки":
+            await settings_command(update, context)
+            return
+        elif text == "💎 Premium":
+            await premium_command(update, context)
+            return
+        elif text == "🎭 Персонажи":
+            await settings_command(update, context)
+            return
+        elif text == "📊 Статистика":
+            await admin_stats(update, context)
+            return
+        elif text == "🔧 Настройки бота":
+            await admin_config(update, context)
+            return
+        elif text == "⬅️ Назад":
+            await update.message.reply_text("Главное меню", reply_markup=MAIN_MENU)
+            return
 
     tg_user = update.effective_user
     chat_id = update.effective_chat.id
@@ -390,17 +393,51 @@ async def private_message_handler(update: Update, context: ContextTypes.DEFAULT_
 
 
 async def group_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка групповых сообщений."""
-    if not update.message or not update.effective_chat:
+    """Обработка групповых сообщений: ответ только при упоминании."""
+    if not update.message or not update.effective_chat or not update.effective_user:
         return
 
-    # Простая логика: если бот упомянут или это reply на его сообщение
-    # TODO: добавить проверку ChatSession.group_reply_mode
-    if update.message.text and (f"@{context.bot.username}" in update.message.text or update.message.reply_to_message):
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-        await update.message.reply_text(
-            f"@{update.effective_user.first_name}, привет! Я пока тестирую групповой режим. Скоро всё будет!"
+    message_text = update.message.text or ""
+    bot_username = context.bot.username or ""
+
+    # Проверяем, упомянут ли бот или это ответ на его сообщение
+    is_mentioned = f"@{bot_username}" in message_text
+    is_reply_to_bot = (
+        update.message.reply_to_message and 
+        update.message.reply_to_message.from_user.username == bot_username
+    )
+
+    if not (is_mentioned or is_reply_to_bot):
+        return
+
+    # Убираем упоминание бота из текста
+    clean_text = message_text.replace(f"@{bot_username}", "").strip()
+    if not clean_text:
+        clean_text = "Привет! Расскажи о себе."  # Запасной вариант
+
+    chat_id = update.effective_chat.id
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+
+    try:
+        # В группах пока используем дефолтного Моргана
+        # Для групп можно добавить отдельную логику оплаты/подписки позже
+        ai = AIService(bot=context.bot, session=None) # session=None, если не сохраняем историю в БД для групп
+        
+        # Генерируем ответ (пока без сохранения истории для MVP)
+        answer = await ai.process_text_message(
+            chat_id=chat_id,
+            user_id=update.effective_user.id,
+            text=clean_text,
+            character_name="morgan",
+            mode=None,
+            is_premium=True  # Групповые ответы пока как для Premium
         )
+        
+        await update.message.reply_text(answer)
+        
+    except Exception as exc:
+        logger.exception(f"Ошибка в групповом чате {chat_id}: {exc}")
+        await update.message.reply_text("Извини, произошла ошибка при обработке запроса.")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):

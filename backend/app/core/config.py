@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     ADMIN_SECRET_KEY: str = "change-me"
     ADMIN_IDS: Optional[str] = None  # comma-separated telegram IDs
 
+    # WebApp
+    WEBAPP_URL: str = ""  # URL where frontend is served (e.g., https://app.morganai.ru)
+
     # Tribute
     TRIBUTE_URL_BASE: str = "https://t.me/tribute/app?startapp="
 

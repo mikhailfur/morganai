@@ -63,7 +63,33 @@ class MiniMaxService:
         raise RuntimeError("MiniMax TTS response does not contain audio")
 
     async def transcribe_voice(self, audio_bytes: bytes, mime_type: str = "audio/ogg") -> str:
-        """Распознаёт текст из голосового (STT). Заготовка для MiniMax STT endpoint."""
-        # MiniMax STT API пока в beta / различается по документации.
-        # Реализация через multipart upload.
-        raise NotImplementedError("MiniMax STT endpoint not implemented yet")
+        """Распознаёт текст из голосового сообщения (STT) через MiniMax API."""
+        if not self.api_key:
+            raise RuntimeError("MINIMAX_API_KEY не задан")
+
+        # Эндпоинт MiniMax для распознавания речи (ASR)
+        # Документация может отличаться, примерный путь:
+        url = f"{self.base_url}/a2t/v2"
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+        }
+        
+        # Формируем multipart/form-data
+        files = {"file": ("voice.ogg", audio_bytes, mime_type)}
+        data = {"model": "speech-01"}  # Уточнить модель в документации MiniMax
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, headers=headers, files=files, data=data)
+            response.raise_for_status()
+            resp_data = response.json()
+        
+        # Парсим ответ (структура зависит от API MiniMax)
+        if "text" in resp_data:
+            logger.info("[MiniMax STT] текст успешно распознан")
+            return resp_data["text"]
+        elif "data" in resp_data and "text" in resp_data["data"]:
+            return resp_data["data"]["text"]
+        
+        logger.error(f"[MiniMax STT] неожиданный ответ: {resp_data}")
+        raise RuntimeError("Не удалось распознать речь")

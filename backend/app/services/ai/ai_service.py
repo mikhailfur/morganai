@@ -128,7 +128,12 @@ class AIService:
         return buf
 
     async def process_voice_transcription(self, audio_bytes: bytes) -> str:
-        """Транскрибирует голосовое сообщение пользователя (STT)."""
-        # TODO: реализовать через Whisper / MiniMax STT
-        # Пока возвращаем заглушку, чтобы не ломать flow
-        return "[Голосовое сообщение — текст пока не распознан]"
+        """Транскрибирует голосовое сообщение пользователя (STT) через MiniMax."""
+        await self._set_record_voice(self.bot.chat_id if hasattr(self.bot, 'chat_id') else 0) # Индикатор записи
+        try:
+            text = await self.minimax.transcribe_voice(audio_bytes)
+            logger.info(f"[STT] Распознано: {text[:50]}...")
+            return text
+        except Exception as exc:
+            logger.error(f"Ошибка STT: {exc}")
+            return "[Не удалось распознать голосовое сообщение]"
