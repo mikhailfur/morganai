@@ -1,25 +1,36 @@
-version: '3.8'
 services:
-  postgres:
-    image: postgres:16-alpine
-    restart: always
-    environment:
-      POSTGRES_DB: morganai
-      POSTGRES_USER: morganuser
-      POSTGRES_PASSWORD: morganpass
-    ports:
-      - '5432:5432'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    networks:
+      - morgan_network
 
-  # Backend service is optional in compose for local dev
-  # backend:
-  #   build: ./backend
-  #   ports:
-  #     - '4000:4000'
-  #   env_file: .env
-  #   depends_on:
-  #     - postgres
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    expose:
+      - "80"
+    networks:
+      - morgan_network
 
 volumes:
   postgres_data:
+
+networks:
+  morgan_network:
+    driver: bridge

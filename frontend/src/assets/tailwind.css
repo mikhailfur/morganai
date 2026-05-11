@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Кастомные утилиты в стиле Claude */
+@layer components {
+  .card-claude {
+    @apply bg-claude-surface border border-claude-border rounded-2xl shadow-sm transition-all duration-300 hover:shadow-md;
+  }
+  .btn-primary {
+    @apply bg-claude-accent text-white px-5 py-2.5 rounded-xl font-medium hover:bg-claude-accent-hover transition-colors duration-200;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-claude-muted px-4 py-2 rounded-xl hover:text-claude-text hover:bg-gray-50 transition-colors duration-200;
+  }
+  .text-gradient {
+    background: linear-gradient(135deg, #D97757 0%, #B95C3E 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
