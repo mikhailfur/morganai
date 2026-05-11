@@ -1,32 +1,41 @@
-"""main.py — Точка входа FastAPI + Telegram Webhook."""
+"""main.py — Точка входа FastAPI + Telegram Webhook + APScheduler."""
 
 import logging
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from telegram import Bot, Update
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     MessageHandler,
     filters,
 )
 
-from app.api.routers.health import router as health_router
-from app.api.routers.users import router as users_router
-from app.api.routers.characters import router as characters_router
-from app.api.routers.payments import router as payments_router
 from app.api.routers.admin import router as admin_router
+from app.api.routers.characters import router as characters_router
+from app.api.routers.health import router as health_router
+from app.api.routers.payments import router as payments_router
 from app.api.routers.telegram_webhook import router as telegram_webhook_router
+from app.api.routers.users import router as users_router
 from app.core.config import settings
-from app.db.session import engine
 from app.db.base import Base
+from app.db.session import engine
 from app.services.telegram.handlers import (
+    admin_command,
+    callback_handler,
     error_handler,
     group_message_handler,
+    menu_button_handler,
+    premium_command,
     private_message_handler,
+    profile_command,
+    settings_command,
     start_command,
 )
+from app.tasks.tribute import check_tribute_subscriptions
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -36,19 +45,31 @@ logger = logging.getLogger(__name__)
 
 
 async def lifespan(app: FastAPI):
-    """Lifespan: инициализация webhook при старте."""
-    # Создание таблиц
+    """Инициализация: БД, Telegram Application/Webhook, Scheduler."""
+    # --- БД ---
     logger.info("Инициализация БД...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    logger.info("Таблицы БД созданы (или уже существовали)")
+    logger.info("Таблицы БД готовы")
 
-    # Настройка Telegram Application
+    # --- Telegram Application ---
     logger.info("Инициализация Telegram Application...")
     telegram_app = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).build()
 
     # Регистрация хэндлеров
     telegram_app.add_handler(CommandHandler("start", start_command))
+    telegram_app.add_handler(CommandHandler("profile", profile_command))
+    telegram_app.add_handler(CommandHandler("settings", settings_command))
+    telegram_app.add_handler(CommandHandler("premium", premium_command))
+    telegram_app.add_handler(CommandHandler("admin", admin_command))
+
+    # Inline-кнопки
+    telegram_app.add_handler(CallbackQueryHandler(callback_handler))
+
+    # Reply-кнопки меню (текстовые)
+    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler))
+
+    # Все остальные приватные сообщения (фото, голос, текст)
     telegram_app.add_handler(
         MessageHandler(filters.ChatType.PRIVATE & ~filters.COMMAND, private_message_handler)
     )
@@ -61,7 +82,7 @@ async def lifespan(app: FastAPI):
     await telegram_app.start()
     logger.info("Telegram Application запущена")
 
-    # Установка webhook
+    # --- Webhook ---
     if not settings.TELEGRAM_WEBHOOK_URL:
         logger.error("!!! TELEGRAM_WEBHOOK_URL не задан в .env !!! Webhook НЕ будет установлен. Бот молчит.")
     else:
@@ -71,21 +92,35 @@ async def lifespan(app: FastAPI):
                 url=webhook_url,
                 secret_token=settings.TELEGRAM_WEBHOOK_SECRET,
             )
-            # Проверим, что webhook реально установился
             info = await telegram_app.bot.get_webhook_info()
             if info.url == webhook_url:
                 logger.info(f"✅ Webhook успешно установлен: {info.url}")
             else:
-                logger.warning(f"⚠️ Webhook URL не совпадает! Ожидалось: {webhook_url}, Получено: {info.url}")
+                logger.warning(f"⚠️ Webhook URL не совпал: ожидалось {webhook_url}, получено {info.url}")
         except Exception as exc:
             logger.exception(f"❌ Ошибка установки webhook: {exc}")
 
     app.state.telegram_app = telegram_app
 
+    # --- APScheduler (Tribute checker) ---
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        check_tribute_subscriptions,
+        "interval",
+        minutes=5,
+        id="tribute_checker",
+        replace_existing=True,
+    )
+    scheduler.start()
+    logger.info("APScheduler запущен (Tribute checker каждые 5 мин)")
+    app.state.scheduler = scheduler
+
     yield
 
-    # Graceful shutdown
-    logger.info("Остановка Telegram Bot...")
+    # --- Graceful shutdown ---
+    logger.info("Остановка Telegram Bot и Scheduler...")
+    if hasattr(app.state, "scheduler"):
+        app.state.scheduler.shutdown(wait=False)
     await telegram_app.stop()
     await telegram_app.shutdown()
     logger.info("Telegram Bot остановлен")
@@ -98,7 +133,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# --- Routers ---
+# --- FastAPI Routers ---
 app.include_router(health_router, tags=["health"])
 app.include_router(users_router, prefix="/api/users", tags=["users"])
 app.include_router(characters_router, prefix="/api/characters", tags=["characters"])
@@ -117,12 +152,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# --- Telegram Webhook endpoints ---
+# --- Telegram Webhook endpoint ---
 @app.post("/webhook/telegram")
 async def telegram_webhook_endpoint(request: Request):
     """Принимает обновления от Telegram."""
     logger.info("📩 Получен POST /webhook/telegram от Telegram")
-    
     telegram_app: Application = request.app.state.telegram_app
 
     # Проверка секретного токена
@@ -143,7 +177,7 @@ async def telegram_webhook_endpoint(request: Request):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"detail": "Failed to process update"},
         )
-    
+
     return {"status": "ok"}
 
 
@@ -152,7 +186,7 @@ async def get_telegram_webhook_status():
     """Диагностика: возвращает текущий webhook-статус из Telegram."""
     if not settings.TELEGRAM_BOT_TOKEN:
         return JSONResponse(status_code=500, content={"error": "TELEGRAM_BOT_TOKEN не задан"})
-    
+
     try:
         bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
         info = await bot.get_webhook_info()

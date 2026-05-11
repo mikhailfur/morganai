@@ -22,7 +22,14 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_WEBHOOK_URL: str = ""
     TELEGRAM_WEBHOOK_SECRET: str = ""
-    TELEGRAM_PREMIUM_CHANNEL_ID: Optional[str] = None  # для проверки подписки Tribute
+    TELEGRAM_PREMIUM_CHANNEL_ID: Optional[str] = None
+
+    # Admin
+    ADMIN_SECRET_KEY: str = "change-me"
+    ADMIN_IDS: Optional[str] = None  # comma-separated telegram IDs
+
+    # Tribute
+    TRIBUTE_URL_BASE: str = "https://t.me/tribute/app?startapp="
 
     # OpenRouter
     OPENROUTER_API_KEY: str = ""
