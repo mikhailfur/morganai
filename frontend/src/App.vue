@@ -1,7 +1,12 @@
 <template>
-  <CharacterList />
+  <div id="app" class="min-h-screen bg-claude-bg">
+    <router-view />
+  </div>
 </template>
 
 <script setup>
-import CharacterList from './components/CharacterList.vue'
+/**
+ * App.vue — Корневой компонент.
+ * Использует Vue Router для отображения страниц.
+ */
 </script>
