@@ -4,11 +4,10 @@ import logging
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
-from telegram import Update
+from telegram import Bot, Update
 from telegram.ext import (
     Application,
     CommandHandler,
-    ContextTypes,
     MessageHandler,
     filters,
 )
@@ -38,11 +37,14 @@ logger = logging.getLogger(__name__)
 
 async def lifespan(app: FastAPI):
     """Lifespan: инициализация webhook при старте."""
-    # Создание таблиц (для быстрого старта; в продакшене — Alembic)
+    # Создание таблиц
+    logger.info("Инициализация БД...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    logger.info("Таблицы БД созданы (или уже существовали)")
 
-    # Настройка Telegram Application и Webhook
+    # Настройка Telegram Application
+    logger.info("Инициализация Telegram Application...")
     telegram_app = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).build()
 
     # Регистрация хэндлеров
@@ -57,23 +59,36 @@ async def lifespan(app: FastAPI):
 
     await telegram_app.initialize()
     await telegram_app.start()
+    logger.info("Telegram Application запущена")
 
-    # Установка вебхука
-    webhook_url = f"{settings.TELEGRAM_WEBHOOK_URL}/webhook/telegram"
-    await telegram_app.bot.set_webhook(
-        url=webhook_url,
-        secret_token=settings.TELEGRAM_WEBHOOK_SECRET,
-    )
-    logger.info(f"Webhook установлен: {webhook_url}")
+    # Установка webhook
+    if not settings.TELEGRAM_WEBHOOK_URL:
+        logger.error("!!! TELEGRAM_WEBHOOK_URL не задан в .env !!! Webhook НЕ будет установлен. Бот молчит.")
+    else:
+        webhook_url = f"{settings.TELEGRAM_WEBHOOK_URL.rstrip('/')}/webhook/telegram"
+        try:
+            await telegram_app.bot.set_webhook(
+                url=webhook_url,
+                secret_token=settings.TELEGRAM_WEBHOOK_SECRET,
+            )
+            # Проверим, что webhook реально установился
+            info = await telegram_app.bot.get_webhook_info()
+            if info.url == webhook_url:
+                logger.info(f"✅ Webhook успешно установлен: {info.url}")
+            else:
+                logger.warning(f"⚠️ Webhook URL не совпадает! Ожидалось: {webhook_url}, Получено: {info.url}")
+        except Exception as exc:
+            logger.exception(f"❌ Ошибка установки webhook: {exc}")
 
     app.state.telegram_app = telegram_app
 
     yield
 
     # Graceful shutdown
+    logger.info("Остановка Telegram Bot...")
     await telegram_app.stop()
     await telegram_app.shutdown()
-    logger.info(" Telegram Bot остановлен")
+    logger.info("Telegram Bot остановлен")
 
 
 app = FastAPI(
@@ -102,18 +117,55 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# --- Telegram Webhook endpoint ---
+# --- Telegram Webhook endpoints ---
 @app.post("/webhook/telegram")
 async def telegram_webhook_endpoint(request: Request):
     """Принимает обновления от Telegram."""
+    logger.info("📩 Получен POST /webhook/telegram от Telegram")
+    
     telegram_app: Application = request.app.state.telegram_app
 
     # Проверка секретного токена
     secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
     if settings.TELEGRAM_WEBHOOK_SECRET and secret != settings.TELEGRAM_WEBHOOK_SECRET:
+        logger.warning(f"⛔ Неверный secret_token: {secret[:10]}...")
         return JSONResponse(status_code=403, content={"detail": "Forbidden"})
 
-    data = await request.json()
-    update = Update.de_json(data, telegram_app.bot)
-    await telegram_app.process_update(update)
+    try:
+        data = await request.json()
+        logger.debug(f"Update data: {data}")
+        update = Update.de_json(data, telegram_app.bot)
+        await telegram_app.process_update(update)
+        logger.info("✅ Update успешно обработан")
+    except Exception as exc:
+        logger.exception(f"❌ Ошибка при обработке update: {exc}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": "Failed to process update"},
+        )
+    
     return {"status": "ok"}
+
+
+@app.get("/webhook/status")
+async def get_telegram_webhook_status():
+    """Диагностика: возвращает текущий webhook-статус из Telegram."""
+    if not settings.TELEGRAM_BOT_TOKEN:
+        return JSONResponse(status_code=500, content={"error": "TELEGRAM_BOT_TOKEN не задан"})
+    
+    try:
+        bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
+        info = await bot.get_webhook_info()
+        return {
+            "webhook_url": info.url,
+            "has_custom_certificate": info.has_custom_certificate,
+            "pending_update_count": info.pending_update_count,
+            "last_error_date": info.last_error_date.isoformat() if info.last_error_date else None,
+            "last_error_message": info.last_error_message,
+            "max_connections": info.max_connections,
+            "ip_address": info.ip_address,
+            "expected_webhook_url": f"{settings.TELEGRAM_WEBHOOK_URL.rstrip('/')}/webhook/telegram" if settings.TELEGRAM_WEBHOOK_URL else None,
+        }
+    except Exception as exc:
+        logger.exception("Ошибка получения webhook info")
+        return JSONResponse(status_code=500, content={"error": str(exc)})
