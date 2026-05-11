@@ -1,188 +1,265 @@
-# Morgan AI
+# Morgan AI — Отдельный деплой Backend + Frontend
 
-Модульный каркас ИИ-платформы (Telegram-бот + WebApp) на **Python 3.11** / **FastAPI** + **Vue 3**.
-
----
-
-## Стек технологий
-
-| Слой | Технология |
-|------|------------|
-| Backend | Python 3.11, FastAPI, python-telegram-bot, SQLAlchemy 2.0 (async), asyncpg, Alembic, APScheduler |
-| Frontend | Vue 3 (Composition API), Pinia, TailwindCSS, Vite |
-| БД | PostgreSQL 15 |
-| AI | OpenRouter API, MiniMax (заготовки) |
-| Платежи | Tribute (Telegram канал), Paddle (вебхуки) |
-| Инфра | Docker, Docker Compose, Nginx |
+Модульный каркас ИИ-платформы (Telegram-бот + WebApp).
+Backend и Frontend теперь деплоятся **отдельно** (например, в Dokploy как два независимых Docker-сервиса).
 
 ---
 
-## Быстрый старт (локально через Docker)
+## Что изменено по сравнению с монолитным `docker-compose`
 
-### 1. Клонировать репозиторий
+- **Backend** — отдельный Docker-образ (FastAPI + python-telegram-bot). Нет связи с `db` через Docker network. База данных подключается по внешнему `DATABASE_URL`.
+- **Frontend** — отдельный Docker-образ (Nginx + статика Vue). **Нет `proxy_pass` на backend**. Nginx просто отдаёт SPA; API вызовы уходят на `VITE_API_URL`.
+- **`docker-compose.yml` удалён** — больше не нужен, так как сервисы не связываются через Docker Compose.
+- **Исправлен баг `AttributeError: 'APIRouter' object has no attribute 'router'`** — убрана переопределяющая логика в `api/routers/__init__.py`, импорты теперь идут напрямую из модулей.
 
-```bash
-git clone <repo-url> morganai
-cd morganai
+---
+
+## Структура проекта
+
 ```
-
-### 2. Подготовить файл окружения
-
-```bash
-cp .env.example .env
-```
-
-Открой `.env` и **заполни обязательные поля**:
-
-- `TELEGRAM_BOT_TOKEN` — токен от @BotFather
-- `TELEGRAM_WEBHOOK_URL` — публичный HTTPS URL твоего сервера (для локального теста Telegram webhook можно пропустить, см. раздел ниже)
-- `OPENROUTER_API_KEY` — ключ с [openrouter.ai](https://openrouter.ai)
-- `DATABASE_URL` по умолчанию указывает на сервис `db` внутри docker-compose; для локального запуска Python без Docker замени `db` на `localhost`.
-
-### 3. Поднять всё через Docker Compose
-
-```bash
-docker compose up --build -d
-```
-
-Это запустит 3 сервиса:
-- **PostgreSQL** (`db`) — на внутреннем порту `5432`
-- **Backend** (`backend`) — FastAPI на `http://localhost:8000`
-- **Frontend** (`frontend`) — Nginx с собранным Vue на `http://localhost:80`
-
-### 4. Проверка работы
-
-| Что проверяем | URL / Команда |
-|---------------|---------------|
-| Health-check API | [http://localhost/](http://localhost/) → проксирует на `frontend`, но API доступен через `/api` |
-| Backend напрямую | [http://localhost:8000/](http://localhost:8000/) (если пробросил порт) |
-| Health endpoint | `curl http://localhost:80/api/` (должен вернуть `{"status":"ok"}`) |
-| WebApp UI | [http://localhost/](http://localhost/) — должен открыться список персонажей |
-| Логи бэкенда | `docker compose logs -f backend` |
-| Логи БД | `docker compose logs -f db` |
-
-### 5. Остановка
-
-```bash
-docker compose down
-# Чтобы удалить и том с данными PostgreSQL:
-docker compose down -v
+morganai/
+├── .env.example                    # Шаблон переменных окружения (backend + frontend)
+├── ARCHITECTURE.md                  # Архитектурное описание
+├── README.md                        # Этот файл
+│
+├── backend/
+│   ├── Dockerfile                   # Python 3.11 + Uvicorn
+│   ├── .dockerignore
+│   ├── requirements.txt
+│   ├── main.py                      # FastAPI + Telegram Webhook
+│   └── app/...
+│
+└── frontend/
+    ├── Dockerfile                   # Multi-stage: Node → Nginx (без proxy_pass)
+    ├── .dockerignore
+    ├── nginx.conf                   # Чистая статика SPA
+    ├── .env.example                 # VITE_API_URL
+    ├── vite.config.js
+    ├── package.json
+    └── src/...
 ```
 
 ---
 
-## Добавление зависимостей
+## 1. Backend (FastAPI)
 
-Если ты обновил `backend/requirements.txt`, пересобери контейнер:
+### Dockerfile
 
-```bash
-docker compose up --build -d backend
+Использует `python:3.11-slim`, устанавливает зависимости из `requirements.txt` и запускает Uvicorn.
+
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-Аналогично для фронтенда — после изменений в `package.json` пересобери `frontend`.
+### Переменные окружения (backend)
+
+Файл `.env.example` в корне репозитория содержит все переменные.
+
+| Переменная | Описание |
+|---|---|
+| `DATABASE_URL` | Внешний Postgres (например, `postgresql+asyncpg://user:pass@db-host:5432/morgan_ai`) |
+| `TELEGRAM_BOT_TOKEN` | Токен от @BotFather |
+| `TELEGRAM_WEBHOOK_URL` | Публичный HTTPS URL бэкенда (например, `https://api.morganai.ru`) |
+| `TELEGRAM_WEBHOOK_SECRET` | Случайная строка для защиты webhook |
+| `OPENROUTER_API_KEY` | Ключ с [openrouter.ai](https://openrouter.ai) |
+| `OPENROUTER_DEFAULT_MODEL` | Модель по умолчанию |
+| `MINIMAX_API_KEY` | Ключ MiniMax (опционально) |
+| `PADDLE_API_KEY` / `PADDLE_WEBHOOK_SECRET` | Для Paddle (опционально) |
+| `PROACTIVE_MESSAGE_*` | Настройки proactive-рассылки |
+
+**Важно:** убери `POSTGRES_*` из файла, если БД управляется Dokploy / Railway / отдельно.
+
+### Проверка локально (без Docker)
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+Проверь: [http://localhost:8000/](http://localhost:8000/) → `{"status":"ok"}`
 
 ---
 
-## Telegram Webhook (локальное тестирование)
+## 2. Frontend (Vue 3 + Tailwind)
 
-Telegram требует **публичный HTTPS URL** для webhook. Для локальной разработки используй **ngrok**:
+### Dockerfile (frontend)
+
+Multi-stage: собирает Vue через Vite, а затем отдаёт статику через **чистый Nginx** (без reverse-proxy на backend).
+
+```dockerfile
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM nginx:stable-alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### nginx.conf (frontend)
+
+```nginx
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+**Почему нет `proxy_pass`?** Фронт и бэк на разных доменах / портах. Vue-приложение ходит к API через абсолютный `VITE_API_URL` (настраивается в `.env` перед сборкой).
+
+### Переменные окружения (frontend)
+
+| Переменная | Описание |
+|---|---|
+| `VITE_API_URL` | Базовый URL бэкенда **без** trailing slash (например, `https://api.morganai.ru`) |
+
+Эта переменная должна быть доступна **во время сборки** (`npm run build`), потому что Vite встраивает её в код.
+
+### Проверка локально
 
 ```bash
-# Установи ngrok, зарегистрируйся, добавь authtoken
+cd frontend
+npm install
+# Для dev (proxy работает на localhost:8000)
+npm run dev
 
-# Пробрось порт 8000 (backend)
-ngrok http http://localhost:8000
+# Для production-like сборки
+VITE_API_URL=https://api.morganai.ru npm run build
+# Затем можно поднять любой статический сервер из папки dist/
 ```
-
-Скопируй HTTPS-адрес (например, `https://abc123.ngrok-free.app`) и обнови в `.env`:
-
-```
-TELEGRAM_WEBHOOK_URL=https://abc123.ngrok-free.app
-```
-
-Перезапусти backend:
-
-```bash
-docker compose restart backend
-```
-
-После этого бот будет принимать обновления через ngrok в твоём локальном Docker.
 
 ---
 
-## Деплой на Dokploy (и аналогичные Docker-PaaS)
+## 3. Деплой на Dokploy (пошаговый гайд)
 
-[Dokploy](https://github.com/dokploy/dokploy) — self-hosted PaaS, который деплоит через Docker Compose.
+Dokploy позволяет задеплоить каждый сервис как **отдельное приложение**.
 
-### Шаги:
+### Шаг A — Подготовка репозитория
 
-1. **Заведи сервер** (Ubuntu 22.04+, Docker + Dokploy установлены).
-2. **Создай проект** в Dokploy и подключи свой Git-репозиторий.
-3. **Укажи путь к Compose** — корень репозитория (`docker-compose.yml` там лежит).
-4. **Добавь Environment Variables** в Dokploy UI — скопируй содержимое `.env` (кроме `POSTGRES_...`, если используешь встроенный PostgreSQL от Dokploy).
-5. **Настрой домены**:
-   - API / Webhook → порт `8000` (backend)
-   - WebApp (фронтенд) → порт `80` (frontend)
-   - Dokploy автоматически поднимет Traefik и SSL (Let's Encrypt).
-6. **Deploy** — Dokploy сам выполнит `docker compose up --build`.
+1. Залей проект на **GitHub / GitLab**.
+2. Убедись, что `docker-compose.yml` удалён (мы удалили его).
 
-> **Важно**: если Dokploy уже управляет PostgreSQL, можно убрать сервис `db` из `docker-compose.yml` и передать `DATABASE_URL` с данными от внешнего Postgres. Или оставить внутренний `db` — тоже работает.
+### Шаг B — Backend
+
+1. В Dokploy создай новое приложение → **Application**.
+2. Включи **Docker** сборку.
+3. В поле `Dockerfile Path` укажи: `backend/Dockerfile`.
+4. В **Environment Variables** добавь **все** переменные из `.env.example` (кроме `VITE_API_URL` и `POSTGRES_*`):
+   - `DATABASE_URL` — URL твоего Postgres (можно создать через Dokploy Database или внешний)
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_WEBHOOK_URL` — URL этого бэкенда-приложения (например, `https://api.morganai.ru`)
+   - `TELEGRAM_WEBHOOK_SECRET`
+   - `OPENROUTER_API_KEY`
+   - и остальные...
+5. Выбери **Build Type** = `Dockerfile`.
+6. Укажи **Domain** (например, `api.morganai.ru`) — Dokploy сам настроит Traefik + SSL.
+7. Нажми **Deploy**.
+
+После деплоя проверь:
+```bash
+curl https://api.morganai.ru/
+# Ожидается: {"status":"ok"}
+```
+
+### Шаг C — Frontend
+
+1. В Dokploy создай ещё одно приложение → **Application**.
+2. Включи **Docker** сборку.
+3. В поле `Dockerfile Path` укажи: `frontend/Dockerfile`.
+4. В **Environment Variables** добавь:
+   - `VITE_API_URL=https://api.morganai.ru` (URL твоего backend-сервиса)
+   
+   > ⚠️ **Важно:** Если Dokploy не прокидывает `ENV` на этап `docker build` (только runtime), убедись, что в Dockerfile есть строка `ARG VITE_API_URL` + `ENV VITE_API_URL=${VITE_API_URL}`, или добавь `.env` файл в репозиторий с `VITE_API_URL=...`. Для Dokploy проще добавить `VITE_API_URL` в Build Args, если платформа это поддерживает. Если нет — можешь прямо в `vite.config.js` или `.env` репозитория указать URL.
+
+5. Укажи **Domain** (например, `app.morganai.ru`) — Dokploy + SSL.
+6. Нажми **Deploy**.
+
+После деплоя открой `https://app.morganai.ru` — должна открыться страница с персонажами.
 
 ---
 
-## Переменные окружения (описание)
+## 4. Подключение Telegram Webhook
 
-| Переменная | Описание | Пример |
-|------------|----------|--------|
-| `DATABASE_URL` | AsyncPg connection string | `postgresql+asyncpg://postgres:postgres@db:5432/morgan_ai` |
-| `TELEGRAM_BOT_TOKEN` | Токен бота от @BotFather | `7221...:AAH...` |
-| `TELEGRAM_WEBHOOK_URL` | Публичный HTTPS домен | `https://morgan-ai.com` |
-| `TELEGRAM_WEBHOOK_SECRET` | Секрет для валидации webhook | `random_secret_32` |
-| `TELEGRAM_PREMIUM_CHANNEL_ID` | ID закрытого Telegram-канала (Tribute) | `-1001234...` |
-| `OPENROUTER_API_KEY` | API ключ OpenRouter | `sk-or-v1-...` |
-| `OPENROUTER_DEFAULT_MODEL` | Модель по умолчанию | `anthropic/claude-sonnet-4-20250514` |
-| `MINIMAX_API_KEY` | API ключ MiniMax (голос) | — |
-| `PADDLE_API_KEY` | Paddle API (глобальные платежи) | — |
-| `PADDLE_WEBHOOK_SECRET` | Paddle webhook secret | — |
-| `PROACTIVE_MESSAGE_*` | Настройки времени и частоты proactive | 60 / 9 / 21 |
-| `POSTGRES_*` | Логин/пароль для внутреннего сервиса Postgres | postgres / postgres |
+Telegram требует **публичный HTTPS**.
+
+1. После деплоя backend открой URL: `https://api.morganai.ru/webhook/telegram`
+2. Убедись, что `TELEGRAM_WEBHOOK_URL=https://api.morganai.ru` и бот при старте вызывает `setWebhook()`.
+3. Если хочешь подписаться на webhook руками:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://api.morganai.ru/webhook/telegram","secret_token":"YOUR_SECRET"}'
+```
+
+---
+
+## 5. Устранение ошибок
+
+### `AttributeError: 'APIRouter' object has no attribute 'router'`
+
+**Причина:** В `app/api/routers/__init__.py` создавались пустые `APIRouter()`, которые затем импортировались в `main.py` как модули. При вызове `health.router` Python искал атрибут `router` у объекта `APIRouter`, которого нет.
+
+**Фикс:** Убраны определения из `__init__.py`, импорты в `main.py` теперь:
+```python
+from app.api.routers.health import router as health_router
+```
+
+### `host not found in upstream "backend"` (nginx)
+
+**Причина:** `nginx.conf` содержал `proxy_pass http://backend:8000`, но при отдельном деплое сервис `backend` не существует в сети контейнера фронтенда.
+
+**Фикс:** Убраны все `location /api` и `/webhook` из `nginx.conf`. Nginx теперь только отдаёт статику. API запросы Vue делает через `VITE_API_URL`.
 
 ---
 
 ## Полезные команды
 
 ```bash
-# Просмотр логов
-docker compose logs -f backend
+# Локальный запуск backend
+cd backend && uvicorn main:app --reload --port 8000
 
-# Выполнить команду внутри backend-контейнера
-docker compose exec backend bash
+# Локальный запуск frontend
+cd frontend && npm run dev
 
-# Запуск backend вне Docker (для отладки)
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+# Сборка frontend (для проверки перед Docker)
+cd frontend && VITE_API_URL=https://api.morganai.ru npm run build
 
-# Запуск frontend вне Docker (для отладки)
-cd frontend
-npm install
-npm run dev
+# Локальный Docker backend
+cd backend && docker build -t morgan-backend . && docker run -p 8000:8000 --env-file ../.env morgan-backend
 
-# Создание Alembic-миграции
-docker compose exec backend alembic revision --autogenerate -m "init"
-docker compose exec backend alembic upgrade head
+# Локальный Docker frontend
+cd frontend && docker build -t morgan-frontend . && docker run -p 80:80 morgan-frontend
 ```
-
----
-
-## Архитектура
-
-Подробная структура проекта описана в файле [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ---
 
 ## Лицензия
 
-MIT — для внутреннего использования проекта Morgan AI.
+MIT — для внутреннего проекта Morgan AI.

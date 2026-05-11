@@ -1,15 +1,16 @@
 # Этап сборки Vue-приложения
 FROM node:20-alpine AS builder
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
 
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm install
 
 COPY . .
 RUN npm run build
 
-# Этап продакшена — nginx
+# Этап продакшена — чистый nginx (без proxy_pass на backend)
 FROM nginx:stable-alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html

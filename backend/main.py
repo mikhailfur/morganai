@@ -13,7 +13,12 @@ from telegram.ext import (
     filters,
 )
 
-from app.api.routers import admin, characters, health, payments, telegram_webhook, users
+from app.api.routers.health import router as health_router
+from app.api.routers.users import router as users_router
+from app.api.routers.characters import router as characters_router
+from app.api.routers.payments import router as payments_router
+from app.api.routers.admin import router as admin_router
+from app.api.routers.telegram_webhook import router as telegram_webhook_router
 from app.core.config import settings
 from app.db.session import engine
 from app.db.base import Base
@@ -79,12 +84,12 @@ app = FastAPI(
 )
 
 # --- Routers ---
-app.include_router(health.router, tags=["health"])
-app.include_router(users.router, prefix="/api/users", tags=["users"])
-app.include_router(characters.router, prefix="/api/characters", tags=["characters"])
-app.include_router(payments.router, prefix="/api/payments", tags=["payments"])
-app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
-app.include_router(telegram_webhook.router, prefix="/webhook", tags=["webhooks"])
+app.include_router(health_router, tags=["health"])
+app.include_router(users_router, prefix="/api/users", tags=["users"])
+app.include_router(characters_router, prefix="/api/characters", tags=["characters"])
+app.include_router(payments_router, prefix="/api/payments", tags=["payments"])
+app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
+app.include_router(telegram_webhook_router, prefix="/webhook", tags=["webhooks"])
 
 
 # --- Глобальный обработчик ошибок ---
