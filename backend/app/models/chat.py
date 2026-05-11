@@ -29,9 +29,10 @@ class ChatSession(Base):
 
     __tablename__ = "chat_sessions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    character_id = Column(Integer, ForeignKey("characters.id", ondelete="CASCADE"), nullable=True, index=True)
+    # Используем BigInteger, так как Telegram ID могут быть большими
+    id = Column(BigInteger, primary_key=True, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    character_id = Column(BigInteger, ForeignKey("characters.id", ondelete="CASCADE"), nullable=True, index=True)
 
     telegram_chat_id = Column(BigInteger, nullable=False, index=True)
     chat_type = Column(Enum(ChatType), default=ChatType.PRIVATE, nullable=False)
@@ -41,7 +42,7 @@ class ChatSession(Base):
     group_reply_mode = Column(Enum(GroupReplyMode), default=GroupReplyMode.ACTIVE, nullable=True)
     is_active = Column(Boolean, default=True)
 
-    # Метаданные контекста (сериализованный JSON или просто счётчик сообщений)
+    # Метаданные контекста
     context_summary = Column(Text, nullable=True)
     message_count = Column(Integer, default=0)
 
@@ -59,8 +60,8 @@ class Message(Base):
 
     __tablename__ = "messages"
 
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Integer, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(BigInteger, primary_key=True, index=True)
+    session_id = Column(BigInteger, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
 
     role = Column(Enum("user", "assistant", "system", name="message_role"), nullable=False)
     content = Column(Text, nullable=False)  # текст или JSON для мультимодальных данных
@@ -72,7 +73,7 @@ class Message(Base):
     has_voice = Column(Boolean, default=False)
 
     # Метаданные
-    telegram_message_id = Column(Integer, nullable=True)
+    telegram_message_id = Column(BigInteger, nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
 
     # Relationships

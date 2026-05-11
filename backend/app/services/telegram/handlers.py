@@ -17,7 +17,7 @@ from telegram import (
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.agent_modules import get_module_prompt, list_modules
 from app.characters import get_character, list_character_names
@@ -102,19 +102,23 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Выбери персонажа, режим или напиши мне что-нибудь — я всегда на связи."
     )
 
-    webapp_url = getattr(settings, "WEBAPP_URL", settings.TELEGRAM_WEBHOOK_URL)
-    webapp_button = InlineKeyboardMarkup(
-        [
-            [InlineKeyboardButton("🌐 Открыть Morgan AI WebApp", web_app=WebAppInfo(url=webapp_url))],
-            [InlineKeyboardButton("📖 Помощь", callback_data="help")],
-        ]
-    )
-
-    await update.message.reply_text(text, reply_markup=MAIN_MENU)
-    await update.message.reply_text(
-        "Или открой полную версию в WebApp:",
-        reply_markup=webapp_button,
-    )
+    # Проверяем URL для WebApp
+    webapp_url = getattr(settings, "WEBAPP_URL", None)
+    if not webapp_url or not webapp_url.startswith("https://"):
+        logger.warning("WEBAPP_URL не задан или некорректен. Кнопка WebApp не будет показана.")
+        await update.message.reply_text(text, reply_markup=MAIN_MENU)
+    else:
+        webapp_button = InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("🌐 Открыть Morgan AI WebApp", web_app=WebAppInfo(url=webapp_url))],
+                [InlineKeyboardButton("📖 Помощь", callback_data="help")],
+            ]
+        )
+        await update.message.reply_text(text, reply_markup=MAIN_MENU)
+        await update.message.reply_text(
+            "Или открой полную версию в WebApp:",
+            reply_markup=webapp_button,
+        )
 
 
 async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -211,11 +215,9 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Быстрая статистика в админ-меню."""
     async with AsyncSessionLocal() as session:
-        total = await session.scalar(select(User).count())
+        total = await session.scalar(select(func.count(User.id)))
         premium = await session.scalar(
-            select(User)
-            .where(User.is_premium.is_(True))
-            .count()
+            select(func.count(User.id)).where(User.is_premium.is_(True))
         )
         text = (
             f"📊 <b>Статистика</b>\n\n"
