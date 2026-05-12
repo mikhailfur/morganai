@@ -9,8 +9,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.db.session import get_session
+from app.db.session import get_db
 
 router = APIRouter()
 
@@ -36,7 +35,7 @@ FALLBACK_CHARACTERS = [
 
 
 @router.get("/")
-async def list_characters(session: AsyncSession = Depends(get_session)):
+async def list_characters(session: AsyncSession = Depends(get_db)):
     """
     Возвращает список персонажей.
     Пытается прочитать из БД, если не получается — возвращает фоллбэк.
