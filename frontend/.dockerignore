@@ -1,9 +1,0 @@
-node_modules/
-dist/
-.env
-.vite/
-.git/
-.gitignore
-Dockerfile
-.dockerignore
-README.md
