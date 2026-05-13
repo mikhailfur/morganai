@@ -73,7 +73,8 @@ const grantSuccess = ref(false)
 async function fetchStats() {
   loading.value = true
   try {
-    const response = await fetch('/api/v1/admin/stats', {
+    const apiUrl = import.meta.env.VITE_API_URL || ''
+    const response = await fetch(`${apiUrl}/api/v1/admin/stats`, {
       headers: { 'Authorization': 'Bearer dummy-token' }
     })
     stats.value = await response.json()
@@ -86,8 +87,9 @@ async function fetchStats() {
 
 async function grantPremium() {
   try {
+    const apiUrl = import.meta.env.VITE_API_URL || ''
     const response = await fetch(
-      `/api/v1/admin/users/${grantUserId.value}/grant-premium?days=${grantDays.value}`,
+      `${apiUrl}/api/v1/admin/users/${grantUserId.value}/grant-premium?days=${grantDays.value}`,
       {
         method: 'POST',
         headers: { 'Authorization': 'Bearer dummy-token' }

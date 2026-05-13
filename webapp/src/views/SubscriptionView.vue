@@ -51,7 +51,8 @@ const processing = ref(false)
 async function fetchPlans() {
   loading.value = true
   try {
-    const response = await fetch('/api/v1/subscription/plans')
+    const apiUrl = import.meta.env.VITE_API_URL || ''
+    const response = await fetch(`${apiUrl}/api/v1/subscription/plans`)
     plans.value = await response.json()
   } catch (error) {
     console.error('Failed to fetch plans:', error)
@@ -61,19 +62,20 @@ async function fetchPlans() {
 }
 
 async function subscribe(planKey: string) {
-    processing.value = true
-    try {
-      // Determine payment gateway based on user location
-      const gateway = 'tribute' // or 'paddle' for global
-      const response = await fetch('/api/v1/subscription/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: authStore.user?.telegram_id,
-          plan_type: planKey,
-          payment_gateway: gateway
-        })
+  processing.value = true
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || ''
+    // Determine payment gateway based on user location
+    const gateway = 'tribute' // or 'paddle' for global
+    const response = await fetch(`${apiUrl}/api/v1/subscription/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: authStore.user?.telegram_id,
+        plan_type: planKey,
+        payment_gateway: gateway
       })
+    })
 
     if (response.ok) {
       alert('Перенаправление на оплату...')

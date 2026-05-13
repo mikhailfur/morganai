@@ -8,7 +8,8 @@ export const useUserStore = defineStore('user', () => {
 
   async function selectCharacter(characterId: number) {
     try {
-      const response = await fetch(`/api/v1/users/${characterId}/select-character`, {
+      const apiUrl = import.meta.env.VITE_API_URL || ''
+      const response = await fetch(`${apiUrl}/api/v1/users/${characterId}/select-character`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })
@@ -20,7 +21,8 @@ export const useUserStore = defineStore('user', () => {
 
   async function selectMode(modeId: number) {
     try {
-      const response = await fetch(`/api/v1/users/${modeId}/select-mode`, {
+      const apiUrl = import.meta.env.VITE_API_URL || ''
+      const response = await fetch(`${apiUrl}/api/v1/users/${modeId}/select-mode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })

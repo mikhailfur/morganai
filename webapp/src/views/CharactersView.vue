@@ -39,7 +39,8 @@ const loading = ref(false)
 async function fetchCharacters() {
   loading.value = true
   try {
-    const response = await fetch(`/api/v1/characters?include_nsfw=${authStore.isPremium}`)
+    const apiUrl = import.meta.env.VITE_API_URL || ''
+    const response = await fetch(`${apiUrl}/api/v1/characters?include_nsfw=${authStore.isPremium}`)
     characters.value = await response.json()
   } catch (error) {
     console.error('Failed to fetch characters:', error)

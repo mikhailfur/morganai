@@ -40,7 +40,8 @@ const loading = ref(false)
 async function fetchModes() {
   loading.value = true
   try {
-    const response = await fetch('/api/v1/modes', {
+    const apiUrl = import.meta.env.VITE_API_URL || ''
+    const response = await fetch(`${apiUrl}/api/v1/modes`, {
       headers: {
         'Authorization': 'Bearer dummy-token'
       }

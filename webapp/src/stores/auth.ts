@@ -11,7 +11,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function validateInitData(data: string) {
     try {
-      const response = await fetch('/api/v1/auth/validate', {
+      const apiUrl = import.meta.env.VITE_API_URL || ''
+      const response = await fetch(`${apiUrl}/api/v1/auth/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ initData: data })

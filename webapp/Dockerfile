@@ -9,7 +9,13 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the application with environment variables
+ARG VITE_API_URL=http://localhost:8000
+ARG VITE_WEBAPP_URL=http://localhost:3000
+
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WEBAPP_URL=$VITE_WEBAPP_URL
+
 RUN npm run build
 
 # Production stage
