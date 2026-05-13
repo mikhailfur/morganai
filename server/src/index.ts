@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { config, validateConfig } from './config';
 import { database } from './database';
 import { authMiddleware, adminMiddleware } from './auth';
@@ -14,7 +15,9 @@ import adminRoutes from './routes/admin.routes';
 const app = express();
 
 // Middleware
-app.use(cors({ origin: config.clientUrl, credentials: true }));
+// Allow wildcard (*) or specific origin; JWT in headers — credentials not needed for cross-origin
+const corsOrigin: string | boolean = config.clientUrl === '*' ? true : config.clientUrl;
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
@@ -34,6 +37,15 @@ app.use('/api/admin', authMiddleware, adminMiddleware, adminRoutes);
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });
 });
+
+// Serve built frontend (production: public/ folder exists next to dist/)
+const publicPath = path.join(__dirname, '..', 'public');
+if (fs.existsSync(publicPath)) {
+  app.use(express.static(publicPath));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(publicPath, 'index.html'));
+  });
+}
 
 // Start server
 async function start() {
