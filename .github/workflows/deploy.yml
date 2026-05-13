@@ -41,14 +41,10 @@ jobs:
 
       - name: Trigger Dokploy redeploy
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-            "https://panel.mikhailfur.ru/api/application.redeploy" \
-            -H "Authorization: Bearer ${{ secrets.DOKPLOY_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{"applicationId":"RQcSIQE74yI-SkIkdLVdz"}')
-          echo "Dokploy response: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "::error::Dokploy redeploy failed (HTTP $STATUS). Check DOKPLOY_API_KEY secret."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.DOKPLOY_WEBHOOK_URL }}")
+          echo "Dokploy webhook response: $STATUS"
+          if [[ "$STATUS" != "2"* ]]; then
+            echo "::error::Dokploy webhook failed (HTTP $STATUS)"
             exit 1
           fi
-          echo "✅ Redeploy triggered successfully"
+          echo "✅ Redeploy triggered"
