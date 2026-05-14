@@ -1,0 +1,66 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - link "Morgan 夢" [ref=e5] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e6]: Morgan
+      - generic [ref=e7]: 夢
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - text: Уже есть аккаунт?
+        - link "Войти" [ref=e10] [cursor=pointer]:
+          - /url: /login
+      - button "☽" [ref=e11] [cursor=pointer]
+  - generic [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]: 始
+        - text: ГЛАВА ПЕРВАЯ — НАЧАЛО
+      - generic [ref=e16]:
+        - text: Создай
+        - text: свою
+        - text: историю.
+      - paragraph [ref=e17]: После регистрации мы откроем для тебя персонажей. У каждого — свой характер, голос, прошлое. Кого выберешь первым — решать тебе.
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - generic [ref=e21]: 無料
+          - paragraph [ref=e22]: 50 сообщений в день бесплатно. Без карты.
+        - generic [ref=e23]:
+          - generic [ref=e24]: 声
+          - paragraph [ref=e25]: Голосовые ответы — живой TTS-голос персонажа.
+        - generic [ref=e26]:
+          - generic [ref=e27]: 記
+          - paragraph [ref=e28]: Помнит ваши прошлые разговоры. Всегда.
+      - generic [ref=e29]:
+        - generic [ref=e30]: Или войди через
+        - generic [ref=e31]:
+          - button "Google" [ref=e32] [cursor=pointer]:
+            - img [ref=e33]
+            - text: Google
+          - button "Telegram" [ref=e38] [cursor=pointer]:
+            - img [ref=e39]
+            - text: Telegram
+    - generic [ref=e41]:
+      - generic [ref=e42]:
+        - generic [ref=e43]: "01"
+        - text: СОЗДАТЬ АККАУНТ
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - generic [ref=e46]: Имя · как тебя звать
+          - textbox "напр. Кай" [ref=e47]
+        - generic [ref=e48]:
+          - generic [ref=e49]: Email
+          - textbox "you@morgan.ai" [ref=e50]
+        - generic [ref=e51]:
+          - generic [ref=e52]: Пароль
+          - textbox "≥ 6 символов" [ref=e53]
+        - generic [ref=e54] [cursor=pointer]:
+          - checkbox "Мне исполнилось 18 и я принимаю Условия использования и Политику конфиденциальности." [ref=e55]
+          - generic [ref=e56]:
+            - text: Мне исполнилось 18 и я принимаю
+            - link "Условия использования" [ref=e57]:
+              - /url: /legal
+            - text: и
+            - link "Политику конфиденциальности" [ref=e58]:
+              - /url: /legal
+            - text: .
+        - button "Создать аккаунт →" [ref=e59] [cursor=pointer]

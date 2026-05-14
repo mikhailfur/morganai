@@ -1,0 +1,37 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - link "Morgan 夢" [ref=e6] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e7]: Morgan
+      - generic [ref=e8]: 夢
+    - button "☽" [ref=e9] [cursor=pointer]
+  - generic [ref=e10]:
+    - generic [ref=e11]: 入
+    - text: ВОЙТИ
+  - generic [ref=e12]: С возвращением.
+  - paragraph [ref=e13]: Она помнит, на чём вы остановились.
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16]: Email
+      - textbox "you@morgan.ai" [ref=e17]
+    - generic [ref=e18]:
+      - generic [ref=e19]: Пароль
+      - textbox "••••••••" [ref=e20]
+    - generic [ref=e21]:
+      - generic [ref=e22] [cursor=pointer]:
+        - checkbox "Запомнить меня" [ref=e23]
+        - text: Запомнить меня
+      - generic [ref=e24] [cursor=pointer]: Забыли пароль?
+    - button "Войти →" [ref=e25] [cursor=pointer]
+  - generic [ref=e26]: или
+  - generic [ref=e29]:
+    - button "Google" [ref=e30] [cursor=pointer]:
+      - img [ref=e31]
+      - text: Google
+    - button "Telegram" [ref=e36] [cursor=pointer]:
+      - img [ref=e37]
+      - text: Telegram
+  - paragraph [ref=e39]:
+    - text: Впервые здесь?
+    - link "Создать аккаунт" [ref=e40] [cursor=pointer]:
+      - /url: /register

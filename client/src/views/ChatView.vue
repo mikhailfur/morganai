@@ -3,19 +3,22 @@ import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
+import { useThemeStore } from '../stores/theme'
 
 const router = useRouter()
 const auth = useAuthStore()
 const chat = useChatStore()
+const theme = useThemeStore()
 
 const messageInput = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const isRecording = ref(false)
 const sidebarOpen = ref(false)
-const showSettings = ref(false)
+const showModes = ref(false)
 
 const currentCharacter = computed(() => auth.user?.selected_character || 'morgan')
+const currentCharObj = computed(() => chat.characters.find(c => c.slug === currentCharacter.value))
 
 onMounted(async () => {
   await chat.fetchCharacters()
@@ -27,9 +30,8 @@ watch(() => chat.messages.length, () => nextTick(scrollToBottom))
 watch(() => chat.messages[chat.messages.length - 1]?.content, () => nextTick(scrollToBottom))
 
 function scrollToBottom() {
-  if (messagesContainer.value) {
+  if (messagesContainer.value)
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-  }
 }
 
 async function sendMessage() {
@@ -40,15 +42,10 @@ async function sendMessage() {
 }
 
 function handleKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    sendMessage()
-  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
 }
 
-function triggerFileUpload() {
-  fileInput.value?.click()
-}
+function triggerFileUpload() { fileInput.value?.click() }
 
 async function handleFileUpload(e: Event) {
   const target = e.target as HTMLInputElement
@@ -59,9 +56,8 @@ async function handleFileUpload(e: Event) {
 }
 
 async function clearChat() {
-  if (confirm('Очистить историю чата?')) {
+  if (confirm('Очистить историю чата?'))
     await chat.clearHistory(currentCharacter.value)
-  }
 }
 
 function formatTime(ts?: number) {
@@ -70,238 +66,323 @@ function formatTime(ts?: number) {
 }
 
 function formatContent(text: string) {
-  // Bold *text*
-  let out = text.replace(/\*([^*]+)\*/g, '<em class="text-purple-300/70 not-italic">$1</em>')
-  // Thoughts (text)
-  out = out.replace(/\(([^)]+)\)/g, '<span class="text-slate-500 text-xs block mt-1">($1)</span>')
-  // Newlines
+  let out = text.replace(/\*([^*]+)\*/g, '<em style="color: var(--accent3); font-style: normal;">$1</em>')
+  out = out.replace(/\(([^)]+)\)/g, '<span style="opacity: 0.5; font-size: 0.85em; display: block; margin-top: 4px;">($1)</span>')
   out = out.replace(/\n/g, '<br>')
   return out
 }
 
 const modes = [
-  { id: 'default', icon: '💬', name: 'Обычный' },
-  { id: 'study', icon: '📚', name: 'Учёба' },
-  { id: 'work', icon: '💼', name: 'Работа' },
-  { id: 'psychologist', icon: '🧠', name: 'Психолог' },
-  { id: 'nsfw', icon: '🔥', name: 'NSFW', premium: true },
+  { id: 'default',     sym: 'i',   name: 'Обычный',   desc: 'Стандартный ролевой режим. NSFW фильтр включён.' },
+  { id: 'study',       sym: 'ii',  name: 'Учёба',      desc: 'Репетитор. Помогает с заданиями и объясняет.' },
+  { id: 'work',        sym: 'iii', name: 'Работа',     desc: 'Деловой помощник. Письма, задачи, переговоры.' },
+  { id: 'psychologist',sym: 'iv',  name: 'Психолог',   desc: 'Эмоциональная поддержка. Без оценок и советов.' },
+  { id: 'nsfw',        sym: 'v',   name: 'NSFW · 18+', desc: 'Без фильтра. Только для Premium.', premium: true },
 ]
 
 async function setMode(mode: string) {
   await auth.updateSettings({ behavior_mode: mode })
-  showSettings.value = false
+  showModes.value = false
+}
+
+async function switchCharacter(slug: string) {
+  await auth.updateSettings({ selected_character: slug })
+  await chat.fetchHistory(slug)
+  sidebarOpen.value = false
 }
 </script>
 
 <template>
-  <div class="h-screen flex bg-[var(--color-bg-dark)] relative overflow-hidden">
-    <!-- Ambient Glow -->
-    <div class="fixed top-[-30%] left-[-15%] w-[500px] h-[500px] rounded-full bg-purple-600/5 blur-[100px] pointer-events-none" />
-    <div class="fixed bottom-[-30%] right-[-15%] w-[400px] h-[400px] rounded-full bg-pink-500/5 blur-[100px] pointer-events-none" />
+  <div style="height: 100vh; display: flex; background: var(--bg); color: var(--fg); overflow: hidden; position: relative;">
 
-    <!-- Mobile Sidebar Overlay -->
-    <div v-if="sidebarOpen" class="fixed inset-0 bg-black/60 z-40 md:hidden" @click="sidebarOpen = false" />
+    <!-- Mobile overlay -->
+    <div v-if="sidebarOpen" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 40;" @click="sidebarOpen = false" class="md-hidden" />
 
-    <!-- Sidebar -->
-    <aside :class="[
-      'fixed md:relative z-50 h-full w-72 flex flex-col border-r border-white/5 bg-[var(--color-bg-dark)]/95 backdrop-blur-xl transition-transform duration-300',
-      sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-    ]">
+    <!-- SIDEBAR -->
+    <aside :style="{
+      width: '220px',
+      flexShrink: 0,
+      display: 'flex',
+      flexDirection: 'column',
+      borderRight: 'var(--border)',
+      background: 'var(--bg-alt)',
+      position: window.innerWidth < 768 ? 'fixed' : 'relative',
+      top: 0, bottom: 0, left: 0,
+      zIndex: 50,
+      transform: (window.innerWidth < 768 && !sidebarOpen) ? 'translateX(-100%)' : 'translateX(0)',
+      transition: 'transform 0.25s',
+    }">
       <!-- Logo -->
-      <div class="flex items-center gap-3 px-5 py-5 border-b border-white/5">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center font-bold text-white text-sm">M</div>
-        <span class="font-bold text-lg gradient-text">Morgan AI</span>
-      </div>
-
-      <!-- User Info -->
-      <div class="px-5 py-4 border-b border-white/5">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
-            {{ auth.user?.username?.charAt(0)?.toUpperCase() || '?' }}
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium truncate">{{ auth.user?.username }}</p>
-            <p class="text-xs text-slate-500">{{ auth.isPremium ? '⭐ Premium' : 'Free' }}</p>
-          </div>
+      <div style="padding: 20px 20px 14px; border-bottom: var(--border);">
+        <div style="display: flex; align-items: baseline; gap: 8px;">
+          <span style="font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--accent);">Morgan</span>
+          <span style="font-family: var(--font-display); font-size: 12px; color: var(--accent2);">夢</span>
         </div>
+        <div style="font-family: var(--font-mono); font-size: 9px; color: var(--accent2); letter-spacing: 1.6px; text-transform: uppercase; margin-top: 3px;">AI · OP. III</div>
       </div>
 
-      <!-- Characters List -->
-      <div class="flex-1 overflow-y-auto px-3 py-4">
-        <p class="px-2 text-xs text-slate-500 uppercase tracking-wider mb-3">Персонажи</p>
+      <!-- Nav label -->
+      <div style="padding: 12px 20px 6px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--accent); font-weight: 700; opacity: 0.8;">Меню</div>
+
+      <!-- Characters -->
+      <div style="flex: 1; overflow-y: auto;">
         <button
           v-for="c in chat.characters" :key="c.slug"
-          @click="auth.updateSettings({ selected_character: c.slug }); chat.fetchHistory(c.slug); sidebarOpen = false"
-          :class="[
-            'w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-1 transition-all text-left',
-            currentCharacter === c.slug
-              ? 'bg-purple-500/15 border border-purple-500/30'
-              : 'hover:bg-white/5 border border-transparent'
-          ]"
+          @click="switchCharacter(c.slug)"
+          :class="['nav-item', currentCharacter === c.slug ? 'active' : '']"
+          style="width: 100%; text-align: left;"
         >
-          <div class="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center text-sm">🎭</div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium truncate">{{ c.name }}</p>
-            <p class="text-xs text-slate-500 truncate">{{ c.description }}</p>
+          <div style="font-size: 14px; line-height: 1.2; display: flex; align-items: center; justify-content: space-between;">
+            {{ c.name }}
+            <span v-if="c.is_premium" style="font-family: var(--font-mono); font-size: 9px; color: var(--meta); letter-spacing: 1px;">✦</span>
           </div>
-          <span v-if="c.is_premium" class="text-xs text-yellow-400">⭐</span>
+          <div style="font-family: var(--font-mono); font-size: 9px; opacity: 0.6; margin-top: 3px; letter-spacing: 1px; text-transform: uppercase; font-weight: 400;">
+            {{ c.description?.slice(0, 28) }}{{ c.description?.length > 28 ? '...' : '' }}
+          </div>
         </button>
       </div>
 
-      <!-- Bottom Actions -->
-      <div class="px-3 py-4 border-t border-white/5 flex flex-col gap-2">
-        <button @click="showSettings = true; sidebarOpen = false" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 text-sm text-slate-300 transition-all">
-          ⚙️ <span>Настройки</span>
+      <!-- Bottom actions -->
+      <div style="padding: 8px 0; border-top: var(--border);">
+        <button @click="showModes = true; sidebarOpen = false" class="nav-item" style="width: 100%; text-align: left; font-size: 13px;">
+          Режим: {{ modes.find(m => m.id === auth.user?.behavior_mode)?.name || 'Обычный' }}
         </button>
-        <button @click="clearChat" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 text-sm text-slate-300 transition-all">
-          🗑️ <span>Очистить чат</span>
+        <router-link to="/settings" class="nav-item" style="text-decoration: none; display: block; font-size: 13px;">Настройки</router-link>
+        <button @click="clearChat" class="nav-item" style="width: 100%; text-align: left; font-size: 13px; opacity: 0.7;">Очистить чат</button>
+        <router-link v-if="auth.isAdmin" to="/admin" class="nav-item" style="text-decoration: none; display: block; font-size: 13px;">Админка</router-link>
+        <button @click="theme.toggle()" class="nav-item" style="width: 100%; text-align: left; font-size: 13px; opacity: 0.7;">
+          {{ theme.isDark ? '☀️ Свет' : '🌙 Ночь' }}
         </button>
-        <router-link v-if="auth.isAdmin" to="/admin" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 text-sm text-slate-300 transition-all">
-          🔐 <span>Админка</span>
-        </router-link>
-        <button @click="auth.logout(); router.push('/')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-500/10 text-sm text-red-400 transition-all">
-          🚪 <span>Выйти</span>
-        </button>
+        <button @click="auth.logout(); router.push('/')" class="nav-item" style="width: 100%; text-align: left; font-size: 13px; color: var(--accent2);">Выйти</button>
       </div>
     </aside>
 
-    <!-- Main Chat Area -->
-    <main class="flex-1 flex flex-col min-w-0 relative">
-      <!-- Top Bar -->
-      <header class="flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-[var(--color-bg-dark)]/80 backdrop-blur-md z-10">
-        <button @click="sidebarOpen = !sidebarOpen" class="md:hidden w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white/5 text-slate-400">☰</button>
-        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center">🎭</div>
+    <!-- MAIN CHAT -->
+    <main style="flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative;">
+
+      <!-- Top bar -->
+      <header style="
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 20px;
+        border-bottom: var(--border);
+        background: var(--bg);
+        z-index: 10;
+        flex-shrink: 0;
+      ">
+        <!-- Mobile hamburger -->
+        <button @click="sidebarOpen = !sidebarOpen" style="
+          width: 36px; height: 36px;
+          display: none;
+          align-items: center; justify-content: center;
+          border: var(--border);
+          background: transparent;
+          cursor: pointer;
+          font-size: 16px;
+          color: var(--fg);
+        " class="mobile-menu-btn">☰</button>
+
         <div>
-          <p class="text-sm font-semibold">{{ chat.characters.find(c => c.slug === currentCharacter)?.name || 'Морган' }}</p>
-          <p class="text-xs text-green-400 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-400" /> онлайн</p>
+          <div style="font-family: var(--font-display); font-weight: 600; font-size: 16px; color: var(--accent);">
+            {{ currentCharObj?.name || 'Морган' }}
+          </div>
+          <div style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta); margin-top: 2px;">
+            ● онлайн · {{ modes.find(m => m.id === auth.user?.behavior_mode)?.name || 'Обычный' }}
+          </div>
         </div>
-        <div class="flex-1" />
-        <button @click="showSettings = true" class="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white/5 text-slate-400 transition-colors">⚙️</button>
+        <div style="flex: 1;"></div>
+        <div style="font-family: var(--font-ui); font-size: 12px; color: var(--fg); opacity: 0.6;">
+          {{ auth.isPremium ? '✦ Premium' : 'Free' }}
+        </div>
       </header>
 
-      <!-- Messages -->
-      <div ref="messagesContainer" class="flex-1 overflow-y-auto px-4 md:px-8 py-6 flex flex-col gap-4">
-        <!-- Empty State -->
-        <div v-if="chat.messages.length === 0 && !chat.isLoading" class="flex-1 flex items-center justify-center">
-          <div class="text-center max-w-md">
-            <div class="text-6xl mb-4">🎭</div>
-            <h2 class="text-xl font-semibold mb-2">Начни разговор</h2>
-            <p class="text-slate-400 text-sm">Напиши что-нибудь, и персонаж ответит тебе</p>
+      <!-- Messages area -->
+      <div ref="messagesContainer" style="flex: 1; overflow-y: auto; padding: 24px 32px; display: flex; flex-direction: column; gap: 16px;">
+
+        <!-- Empty state -->
+        <div v-if="chat.messages.length === 0 && !chat.isLoading" style="
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          gap: 16px;
+          text-align: center;
+          padding: 40px;
+        ">
+          <div style="
+            padding: 16px 24px;
+            background: var(--bg-alt);
+            border: var(--border);
+            box-shadow: var(--shadow-sm);
+            position: relative;
+          ">
+            <div style="
+              position: absolute; top: -12px; left: 16px;
+              background: var(--accent3); color: var(--fg);
+              padding: 2px 10px; border: var(--border);
+              font-family: var(--font-ui); font-size: 11px; font-weight: 700;
+            ">{{ currentCharObj?.name || 'МОРГАН' }}</div>
+            <p style="font-family: var(--font-display); font-style: italic; font-size: 17px; line-height: 1.5; color: var(--fg);">
+              {{ currentCharObj?.greeting_message || '«Привет. Напиши что-нибудь — я жду.»' }}
+            </p>
           </div>
+          <p style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg); opacity: 0.4;">Напиши первое сообщение</p>
         </div>
 
         <!-- Messages -->
-        <div v-for="msg in chat.messages" :key="msg.timestamp" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
-          <div :class="msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai'" style="max-width: min(80%, 600px);">
-            <p v-if="msg.role === 'assistant'" class="text-xs text-purple-400 font-medium mb-1">{{ chat.characters.find(c => c.slug === currentCharacter)?.name || 'Морган' }}</p>
-            <div v-html="formatContent(msg.content)" class="text-sm leading-relaxed whitespace-pre-wrap" />
-            <!-- Voice Player -->
-            <audio v-if="msg.voiceUrl || msg.has_voice" :src="msg.voiceUrl" controls class="mt-2 w-full h-8 opacity-80" />
-            <!-- Streaming cursor -->
-            <span v-if="msg.isStreaming" class="inline-block w-2 h-4 bg-purple-400 animate-pulse ml-0.5 align-middle" />
-            <p class="text-[10px] mt-1.5 opacity-40">{{ formatTime(msg.timestamp) }}</p>
+        <div v-for="msg in chat.messages" :key="msg.timestamp" :style="{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }">
+          <div :class="msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai'">
+            <div v-if="msg.role === 'assistant'" style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--accent2); margin-bottom: 6px;">
+              {{ currentCharObj?.name || 'Морган' }}
+            </div>
+            <div v-html="formatContent(msg.content)" style="line-height: 1.55;" />
+            <audio v-if="msg.voiceUrl || msg.has_voice" :src="msg.voiceUrl" controls style="margin-top: 10px; width: 100%; height: 32px; opacity: 0.85;" />
+            <span v-if="msg.isStreaming" style="display: inline-block; width: 8px; height: 16px; background: var(--accent2); margin-left: 2px; animation: typingBounce 1s infinite;" />
+            <div style="font-family: var(--font-mono); font-size: 9px; margin-top: 6px; opacity: 0.4; letter-spacing: 0.5px;">{{ formatTime(msg.timestamp) }}</div>
           </div>
         </div>
 
-        <!-- Typing Indicator -->
-        <div v-if="chat.isLoading && !chat.isStreaming" class="flex justify-start">
-          <div class="chat-bubble-ai">
-            <div class="typing-indicator">
-              <span /><span /><span />
-            </div>
+        <!-- Typing indicator -->
+        <div v-if="chat.isLoading && !chat.isStreaming" style="display: flex; justify-content: flex-start;">
+          <div class="chat-bubble-ai" style="display: flex; gap: 5px; padding: 14px 16px;">
+            <span class="typing-dot" />
+            <span class="typing-dot" />
+            <span class="typing-dot" />
           </div>
         </div>
       </div>
 
-      <!-- Input Area -->
-      <div class="border-t border-white/5 px-4 md:px-8 py-4 bg-[var(--color-bg-dark)]/80 backdrop-blur-md">
-        <div class="flex items-end gap-3 max-w-4xl mx-auto">
-          <!-- Image Upload -->
-          <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="handleFileUpload" />
-          <button @click="triggerFileUpload" class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl bg-[var(--color-surface)] hover:bg-purple-500/20 border border-white/5 text-slate-400 hover:text-purple-300 transition-all" title="Загрузить фото">
-            📷
-          </button>
+      <!-- Input area -->
+      <div style="
+        border-top: var(--border);
+        padding: 16px 20px;
+        background: var(--bg);
+        flex-shrink: 0;
+      ">
+        <div style="display: flex; align-items: flex-end; gap: 10px; max-width: 860px; margin: 0 auto;">
+          <input ref="fileInput" type="file" accept="image/*" style="display: none;" @change="handleFileUpload" />
 
-          <!-- Voice Record -->
-          <button
-            @click="isRecording = !isRecording"
-            :class="[
-              'w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl border transition-all',
-              isRecording ? 'bg-red-500/20 border-red-500/40 text-red-400 pulse-ring' : 'bg-[var(--color-surface)] border-white/5 text-slate-400 hover:bg-purple-500/20 hover:text-purple-300'
-            ]"
-            title="Голосовое сообщение"
-          >
-            🎤
-          </button>
+          <button @click="triggerFileUpload" style="
+            width: 40px; height: 40px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            border: var(--border);
+            background: var(--bg-alt);
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.15s;
+          " title="Загрузить фото">📷</button>
 
-          <!-- Text Input -->
-          <div class="flex-1 relative">
-            <textarea
-              v-model="messageInput"
-              @keydown="handleKeydown"
-              placeholder="Напиши сообщение..."
-              rows="1"
-              class="input-field resize-none pr-12 min-h-[44px] max-h-[120px]"
-              :disabled="chat.isLoading"
-            />
-          </div>
+          <button @click="isRecording = !isRecording" :style="{
+            width: '40px', height: '40px', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: 'var(--border)',
+            background: isRecording ? 'var(--accent)' : 'var(--bg-alt)',
+            cursor: 'pointer',
+            fontSize: '16px',
+            transition: 'background 0.15s',
+          }" title="Голосовое сообщение">🎤</button>
 
-          <!-- Send Button -->
+          <textarea
+            v-model="messageInput"
+            @keydown="handleKeydown"
+            placeholder="Напиши сообщение..."
+            rows="1"
+            :disabled="chat.isLoading"
+            class="m-textarea"
+            style="flex: 1; min-height: 40px; max-height: 120px;"
+          />
+
           <button
             @click="sendMessage"
             :disabled="!messageInput.trim() || chat.isLoading"
-            :class="[
-              'w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl transition-all font-bold text-white',
-              messageInput.trim() && !chat.isLoading
-                ? 'bg-gradient-to-br from-purple-500 to-pink-500 hover:shadow-[var(--shadow-glow-accent)] hover:-translate-y-0.5'
-                : 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
-            ]"
-          >
-            ↑
-          </button>
+            :style="{
+              width: '40px', height: '40px', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: 'var(--border)',
+              background: messageInput.trim() && !chat.isLoading ? 'var(--accent)' : 'var(--bg-alt)',
+              color: messageInput.trim() && !chat.isLoading ? 'var(--bg)' : 'var(--fg)',
+              cursor: messageInput.trim() && !chat.isLoading ? 'pointer' : 'not-allowed',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '14px',
+              fontWeight: '700',
+              opacity: messageInput.trim() && !chat.isLoading ? 1 : 0.4,
+              transition: 'background 0.15s',
+            }"
+          >↑</button>
         </div>
       </div>
     </main>
 
-    <!-- Settings Modal -->
+    <!-- MODES MODAL -->
     <Teleport to="body">
-      <div v-if="showSettings" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center px-4" @click.self="showSettings = false">
-        <div class="glass-card w-full max-w-lg p-6 animate-fade-in">
-          <div class="flex items-center justify-between mb-6">
-            <h2 class="text-xl font-bold">⚙️ Настройки</h2>
-            <button @click="showSettings = false" class="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center text-slate-400">✕</button>
-          </div>
-
-          <div class="mb-6">
-            <p class="text-sm text-slate-400 mb-3">Режим поведения</p>
-            <div class="grid grid-cols-2 gap-3">
-              <button
-                v-for="m in modes" :key="m.id"
-                @click="setMode(m.id)"
-                :class="[
-                  'mode-card flex items-center gap-3',
-                  auth.user?.behavior_mode === m.id ? 'active' : '',
-                  m.premium && !auth.isPremium ? 'opacity-50 cursor-not-allowed' : ''
-                ]"
-                :disabled="m.premium && !auth.isPremium"
-              >
-                <span class="text-2xl">{{ m.icon }}</span>
-                <div>
-                  <p class="text-sm font-medium">{{ m.name }}</p>
-                  <p v-if="m.premium" class="text-[10px] text-yellow-400">Premium</p>
-                </div>
-              </button>
+      <div v-if="showModes" style="
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.6);
+        z-index: 200;
+        display: flex; align-items: center; justify-content: center;
+        padding: 24px;
+      " @click.self="showModes = false">
+        <div style="
+          background: var(--bg);
+          border: var(--border);
+          box-shadow: var(--shadow-box);
+          padding: 32px;
+          width: 100%;
+          max-width: 560px;
+          max-height: 90vh;
+          overflow-y: auto;
+        " class="animate-fade-in">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <div class="editorial-label" style="color: var(--accent2);">
+              <span style="opacity: 0.55;">01</span>
+              РЕЖИМ ПОВЕДЕНИЯ
             </div>
+            <button @click="showModes = false" style="
+              background: transparent; border: var(--border);
+              width: 32px; height: 32px;
+              cursor: pointer; font-size: 14px; color: var(--fg);
+            ">✕</button>
           </div>
 
-          <div class="flex items-center justify-between p-4 rounded-xl bg-[var(--color-surface)]">
-            <div>
-              <p class="text-sm font-medium">Статус</p>
-              <p class="text-xs text-slate-400">{{ auth.isPremium ? '⭐ Premium активен' : 'Бесплатная версия' }}</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: var(--border);">
+            <div
+              v-for="(m, i) in modes" :key="m.id"
+              @click="m.premium && !auth.isPremium ? null : setMode(m.id)"
+              :class="['mode-card', auth.user?.behavior_mode === m.id ? 'active' : '']"
+              :style="{
+                borderTop: i >= 2 ? 'var(--border)' : 'none',
+                borderLeft: i % 2 ? 'var(--border)' : 'none',
+                opacity: m.premium && !auth.isPremium ? 0.5 : 1,
+                cursor: m.premium && !auth.isPremium ? 'not-allowed' : 'pointer',
+              }"
+            >
+              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div style="flex: 1;">
+                  <div style="display: flex; align-items: baseline; gap: 8px;">
+                    <span style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.6px; color: var(--meta);">{{ m.sym }}.</span>
+                    <span style="font-family: var(--font-display); font-weight: 500; font-size: 18px; color: var(--fg);">{{ m.name }}</span>
+                  </div>
+                  <p style="font-family: var(--font-display); font-size: 13px; line-height: 1.4; margin-top: 6px; color: var(--fg); opacity: 0.7; font-style: italic;">{{ m.desc }}</p>
+                  <div v-if="m.premium" style="margin-top: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.4px; color: var(--meta); text-transform: uppercase;">✦ Только Premium</div>
+                </div>
+                <div v-if="auth.user?.behavior_mode === m.id" style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.4px; color: var(--accent); margin-left: 8px;">● АКТИВНО</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </Teleport>
+
   </div>
 </template>
+
+<style scoped>
+@media (max-width: 768px) {
+  aside { position: fixed !important; }
+  .mobile-menu-btn { display: flex !important; }
+  div[style*="padding: 24px 32px"] { padding: 16px 16px !important; }
+  div[style*="padding: 16px 20px"] { padding: 12px 12px !important; }
+}
+</style>

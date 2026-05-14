@@ -1,0 +1,84 @@
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: Morgan
+      - generic [ref=e7]: 夢
+    - generic [ref=e8]:
+      - button "🌙" [ref=e9] [cursor=pointer]
+      - link "Войти" [ref=e10] [cursor=pointer]:
+        - /url: /login
+      - link "Начать →" [ref=e11] [cursor=pointer]:
+        - /url: /register
+  - generic [ref=e13]:
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic: Морган · портрет · мягкая улыбка
+      - generic [ref=e16]:
+        - generic [ref=e17]: МОРГАН
+        - paragraph [ref=e18]:
+          - text: «Ты опоздал на пять минут.
+          - text: Но я тебе прощу.»
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: ГЛАВА 一
+        - text: ПЕРВАЯ ВСТРЕЧА
+      - generic [ref=e23]:
+        - text: История,
+        - text: которую
+        - text: пишешь
+        - text: ты.
+      - generic [ref=e24]: 新
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e27]: ▶
+        - generic [ref=e28]: Голос
+      - paragraph [ref=e29]: Услышь, как она смеётся.
+    - generic [ref=e30]:
+      - generic [ref=e31]: Память
+      - paragraph [ref=e32]: Помнит, что было вчера.
+  - generic [ref=e33]:
+    - generic [ref=e34]:
+      - link "Начать историю" [ref=e35] [cursor=pointer]:
+        - /url: /register
+      - generic [ref=e36]:
+        - generic [ref=e37]: 無料
+        - generic [ref=e38]: Бесплатно. 50 сообщений в день.
+    - generic [ref=e39]:
+      - generic [ref=e40]: 12 персонажей
+      - generic [ref=e41]: ·
+      - generic [ref=e42]: русский / english
+      - generic [ref=e43]: ·
+      - generic [ref=e44]: premium 299₽/мес
+  - generic [ref=e45]:
+    - generic [ref=e46]:
+      - generic [ref=e47]: "02"
+      - text: ВОЗМОЖНОСТИ
+    - generic [ref=e48]:
+      - generic [ref=e49]:
+        - generic [ref=e50]: 言
+        - generic [ref=e51]: Ролевой чат
+        - generic [ref=e52]: Глубокие диалоги с уникальными AI-персонажами с памятью и характером.
+      - generic [ref=e53]:
+        - generic [ref=e54]: 声
+        - generic [ref=e55]: Голосовые
+        - generic [ref=e56]: Слышь живой голос персонажа — MiniMax TTS. Автовоспроизведение.
+      - generic [ref=e57]:
+        - generic [ref=e58]: 眼
+        - generic [ref=e59]: Фото
+        - generic [ref=e60]: Отправляй изображения — персонаж видит и реагирует.
+      - generic [ref=e61]:
+        - generic [ref=e62]: 心
+        - generic [ref=e63]: Режимы
+        - generic [ref=e64]: Учёба, работа, психолог и NSFW (18+) — выбери контекст.
+  - contentinfo [ref=e65]:
+    - generic [ref=e66]:
+      - generic [ref=e67]: Morgan
+      - generic [ref=e68]: 夢
+    - generic [ref=e69]:
+      - link "Тарифы" [ref=e70] [cursor=pointer]:
+        - /url: /pricing
+      - link "Политика" [ref=e71] [cursor=pointer]:
+        - /url: /legal
+      - link "Оферта" [ref=e72] [cursor=pointer]:
+        - /url: /legal/oferta
+      - generic [ref=e73]: © 2026 Morgan AI

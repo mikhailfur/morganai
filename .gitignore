@@ -7,3 +7,4 @@ server/uploads/*
 !server/uploads/.gitkeep
 client/dist/
 .opencode/
+.playwright-mcp/

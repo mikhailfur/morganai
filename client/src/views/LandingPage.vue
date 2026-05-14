@@ -1,155 +1,406 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useThemeStore } from '../stores/theme'
 
 const router = useRouter()
 const auth = useAuthStore()
-
-const particles = ref<{ x: number; y: number; delay: number; duration: number }[]>([])
+const theme = useThemeStore()
 
 onMounted(() => {
-  if (auth.isAuthenticated) { router.push('/chat'); return }
-  // Generate particles
-  for (let i = 0; i < 30; i++) {
-    particles.value.push({
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      delay: Math.random() * 10,
-      duration: 15 + Math.random() * 20,
-    })
-  }
+  if (auth.isAuthenticated) router.push('/chat')
 })
-
-const features = [
-  { icon: '💬', title: 'Ролевой чат', desc: 'Глубокие диалоги с уникальными AI-персонажами' },
-  { icon: '🎤', title: 'Голосовые', desc: 'Записывай и получай голосовые сообщения' },
-  { icon: '📷', title: 'Фото', desc: 'Отправляй изображения для анализа и обсуждения' },
-  { icon: '🎭', title: 'Режимы', desc: 'Учёба, работа, психолог и другие' },
-]
 </script>
 
 <template>
-  <div class="min-h-screen relative overflow-hidden">
-    <!-- Particles Background -->
-    <div class="particles-bg">
-      <div
-        v-for="(p, i) in particles" :key="i"
-        class="particle"
-        :style="{
-          left: p.x + '%',
-          bottom: '-5%',
-          animationDelay: p.delay + 's',
-          animationDuration: p.duration + 's',
-          width: (3 + Math.random() * 4) + 'px',
-          height: (3 + Math.random() * 4) + 'px',
-        }"
-      />
+  <div class="min-h-screen" style="background: var(--bg); color: var(--fg);">
+
+    <!-- NAV -->
+    <nav class="landing-nav">
+      <div style="display: flex; align-items: baseline; gap: 10px;">
+        <span style="font-family: var(--font-display); font-weight: 600; font-size: 26px; color: var(--accent); letter-spacing: -0.5px;">Morgan</span>
+        <span style="font-family: var(--font-display); font-size: 16px; color: var(--accent2);">夢</span>
+      </div>
+      <div class="landing-nav-links">
+        <router-link to="/pricing" class="nav-text-link">Тарифы</router-link>
+        <router-link to="/legal" class="nav-text-link">Документы</router-link>
+        <button @click="theme.toggle()" class="theme-toggle">
+          {{ theme.isDark ? '☀️' : '🌙' }}
+        </button>
+        <router-link to="/login" class="btn-ghost btn-sm" style="text-decoration: none;">Войти</router-link>
+        <router-link to="/register" class="btn-primary btn-sm" style="text-decoration: none;">Начать →</router-link>
+      </div>
+    </nav>
+
+    <!-- MANGA PANEL GRID -->
+    <div class="manga-grid-wrap animate-fade-in">
+      <div class="manga-grid">
+        <!-- Big character panel -->
+        <div class="panel-art">
+          <div class="art-slot" style="position: absolute; inset: 0; width: 100%; height: 100%;">
+            <div class="art-slot-label">Морган · портрет · мягкая улыбка</div>
+          </div>
+          <!-- Dialogue box overlay -->
+          <div class="panel-dialogue">
+            <div class="panel-dialogue-label">МОРГАН</div>
+            <p style="font-family: var(--font-display); font-style: italic; font-size: 17px; line-height: 1.45; color: var(--fg);">
+              «Ты опоздал на пять минут.<br>Но я тебе прощу.»
+            </p>
+          </div>
+          <!-- Washi tape decoration -->
+          <div class="washi-tape" style="position: absolute; top: -5px; left: 36px; width: 70px; transform: rotate(-14deg);"></div>
+        </div>
+
+        <!-- Hero text panel -->
+        <div class="panel-hero">
+          <div class="editorial-label" style="color: var(--accent2);">
+            <span style="opacity: 0.55;">ГЛАВА 一</span>
+            ПЕРВАЯ ВСТРЕЧА
+          </div>
+          <div class="display-heading panel-hero-heading">
+            История,<br>
+            <span style="font-style: italic;">которую</span><br>
+            пишешь<br>
+            ты.
+          </div>
+          <!-- Stamp -->
+          <div class="panel-stamp">新</div>
+        </div>
+
+        <!-- Voice panel -->
+        <div class="panel-voice">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="
+              width: 28px; height: 28px;
+              background: var(--fg);
+              color: var(--bg);
+              border-radius: 999px;
+              display: flex; align-items: center; justify-content: center;
+              flex-shrink: 0;
+            ">▶</div>
+            <span style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg);">Голос</span>
+          </div>
+          <p style="font-family: var(--font-display); font-weight: 600; font-size: 19px; line-height: 1.2; color: var(--fg); margin-top: 8px;">Услышь, как она смеётся.</p>
+        </div>
+
+        <!-- Memory panel -->
+        <div class="panel-memory">
+          <span style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--accent3);">Память</span>
+          <p style="font-family: var(--font-display); font-weight: 500; font-size: 19px; line-height: 1.2; margin-top: 8px;">Помнит, что было вчера.</p>
+        </div>
+      </div>
     </div>
 
-    <!-- Gradient Orbs -->
-    <div class="fixed top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-purple-600/10 blur-[120px] pointer-events-none" />
-    <div class="fixed bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-pink-500/10 blur-[120px] pointer-events-none" />
-
-    <!-- Header -->
-    <header class="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center font-bold text-white text-lg">M</div>
-        <span class="text-xl font-bold gradient-text">Morgan AI</span>
-      </div>
-      <div class="flex gap-3">
-        <router-link to="/login" class="btn-ghost text-sm">Войти</router-link>
-        <router-link to="/register" class="btn-primary text-sm">Начать</router-link>
-      </div>
-    </header>
-
-    <!-- Hero Section -->
-    <section class="relative z-10 flex flex-col items-center text-center px-6 pt-16 md:pt-24 pb-20">
-      <div class="animate-fade-in">
-        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-sm mb-8">
-          <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          AI-компаньон нового поколения
-        </div>
-      </div>
-
-      <h1 class="text-5xl md:text-7xl font-extrabold leading-tight mb-6 animate-fade-in-delay-1">
-        Погрузись в мир<br/>
-        <span class="gradient-text">ролевых игр</span>
-        <span class="text-purple-300"> с ИИ</span>
-      </h1>
-
-      <p class="text-lg md:text-xl text-slate-400 max-w-2xl mb-10 animate-fade-in-delay-2">
-        Общайся с уникальными персонажами, отправляй голосовые и фото,
-        выбирай режимы поведения. Morgan AI — это ролевые игры с душой.
-      </p>
-
-      <div class="flex gap-4 animate-fade-in-delay-3">
-        <router-link to="/register" class="btn-primary text-lg px-8 py-4">
-          🚀 Начать бесплатно
+    <!-- CTA BAR -->
+    <div class="cta-bar">
+      <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+        <router-link to="/register" class="btn-primary" style="text-decoration: none; font-size: 15px; padding: 14px 28px;">
+          Начать историю
         </router-link>
-        <a href="#features" class="btn-ghost text-lg px-8 py-4">
-          Узнать больше ↓
-        </a>
-      </div>
-
-      <!-- Chat Preview Mockup -->
-      <div class="mt-16 w-full max-w-2xl glass-card p-6 animate-fade-in-delay-3">
-        <div class="flex flex-col gap-4">
-          <div class="flex justify-start">
-            <div class="chat-bubble-ai">
-              <p class="text-sm text-purple-300 font-medium mb-1">Морган</p>
-              <p>*приподнимает бровь и слегка улыбается*</p>
-              <p class="mt-1">О, привет. Рад тебя видеть. Расскажи о себе?</p>
-              <p class="text-xs text-slate-500 mt-1">(Интересно, что это за человек...)</p>
-            </div>
-          </div>
-          <div class="flex justify-end">
-            <div class="chat-bubble-user">
-              <p>Привет, Морган! Меня зовут Алексей</p>
-            </div>
-          </div>
-          <div class="flex justify-start">
-            <div class="chat-bubble-ai">
-              <p class="text-sm text-purple-300 font-medium mb-1">Морган</p>
-              <p>*кивает с одобрением*</p>
-              <p class="mt-1">Алексей, значит. Хорошее имя. Ну что, готов к приключениям? 😏</p>
-              <p class="text-xs text-slate-500 mt-1">(Кажется, мы подружимся.)</p>
-            </div>
-          </div>
-        </div>
-        <div class="mt-4 flex items-center gap-2 bg-[var(--color-surface)] rounded-2xl p-3">
-          <input class="flex-1 bg-transparent text-sm outline-none text-slate-300 placeholder:text-slate-600" placeholder="Напиши сообщение..." disabled />
-          <button class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm" disabled>↑</button>
+        <div style="display: flex; align-items: center; gap: 10px; font-family: var(--font-ui); font-size: 13px; color: var(--fg);">
+          <div style="
+            width: 42px; height: 42px;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            display: flex; align-items: center; justify-content: center;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 13px;
+            transform: rotate(-8deg);
+            opacity: 0.85;
+            flex-shrink: 0;
+          ">無料</div>
+          <span style="opacity: 0.8;">Бесплатно. 50 сообщений в день.</span>
         </div>
       </div>
-    </section>
+      <div style="display: flex; gap: 16px; font-family: var(--font-mono); font-size: 10px; color: var(--fg); opacity: 0.6; letter-spacing: 1.2px; text-transform: uppercase; flex-wrap: wrap;">
+        <span>12 персонажей</span>
+        <span>·</span>
+        <span>русский / english</span>
+        <span>·</span>
+        <span>premium 299₽/мес</span>
+      </div>
+    </div>
 
-    <!-- Features -->
-    <section id="features" class="relative z-10 px-6 md:px-12 py-20">
-      <h2 class="text-3xl md:text-4xl font-bold text-center mb-12">
-        Всё что нужно для <span class="gradient-text">RP</span>
-      </h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-        <div v-for="f in features" :key="f.title" class="glass-card p-6 text-center">
-          <div class="text-4xl mb-4">{{ f.icon }}</div>
-          <h3 class="text-lg font-semibold mb-2">{{ f.title }}</h3>
-          <p class="text-slate-400 text-sm">{{ f.desc }}</p>
+    <!-- FEATURES -->
+    <section class="features">
+      <div class="editorial-label" style="color: var(--accent2); margin-bottom: 20px;">
+        <span style="opacity: 0.55;">02</span>
+        ВОЗМОЖНОСТИ
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0;">
+        <div v-for="(f, i) in features" :key="f.title" style="
+          padding: 24px;
+          border: var(--border);
+          border-left: none;
+          background: var(--bg);
+        " :style="i === 0 ? 'border-left: var(--border)' : ''">
+          <div style="font-family: var(--font-display); font-size: 32px; color: var(--accent2); margin-bottom: 12px;">{{ f.icon }}</div>
+          <div style="font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--accent); margin-bottom: 8px;">{{ f.title }}</div>
+          <div style="font-family: var(--font-ui); font-size: 14px; color: var(--fg); opacity: 0.75; line-height: 1.5;">{{ f.desc }}</div>
         </div>
       </div>
     </section>
 
-    <!-- CTA -->
-    <section class="relative z-10 px-6 py-20 text-center">
-      <div class="glass-card max-w-3xl mx-auto p-12">
-        <h2 class="text-3xl font-bold mb-4">Готов начать?</h2>
-        <p class="text-slate-400 mb-8">Регистрация бесплатна. Начни общаться с Морганом прямо сейчас.</p>
-        <router-link to="/register" class="btn-primary text-lg px-10 py-4">Создать аккаунт</router-link>
+    <!-- FOOTER -->
+    <footer class="landing-footer">
+      <div style="display: flex; align-items: baseline; gap: 10px;">
+        <span style="font-family: var(--font-display); font-weight: 600; font-size: 18px; color: var(--accent);">Morgan</span>
+        <span style="font-family: var(--font-display); font-size: 12px; color: var(--accent2);">夢</span>
       </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="relative z-10 border-t border-white/5 px-6 py-8 text-center text-slate-500 text-sm">
-      <p>© 2026 Morgan AI. Создано с ❤️</p>
+      <div style="display: flex; gap: 16px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg); opacity: 0.55; flex-wrap: wrap;">
+        <router-link to="/pricing" style="color: inherit; text-decoration: none; opacity: 0.7;">Тарифы</router-link>
+        <router-link to="/legal" style="color: inherit; text-decoration: none; opacity: 0.7;">Политика</router-link>
+        <router-link to="/legal/oferta" style="color: inherit; text-decoration: none; opacity: 0.7;">Оферта</router-link>
+        <span>© 2026 Morgan AI</span>
+      </div>
     </footer>
+
   </div>
 </template>
+
+<script lang="ts">
+export default {
+  data() {
+    return {
+      features: [
+        { icon: '言', title: 'Ролевой чат', desc: 'Глубокие диалоги с уникальными AI-персонажами с памятью и характером.' },
+        { icon: '声', title: 'Голосовые', desc: 'Слышь живой голос персонажа — MiniMax TTS. Автовоспроизведение.' },
+        { icon: '眼', title: 'Фото', desc: 'Отправляй изображения — персонаж видит и реагирует.' },
+        { icon: '心', title: 'Режимы', desc: 'Учёба, работа, психолог и NSFW (18+) — выбери контекст.' },
+      ]
+    }
+  }
+}
+</script>
+
+<style scoped>
+/* NAV */
+.landing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 48px;
+  border-bottom: var(--border);
+}
+.landing-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-text-link {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--fg);
+  text-decoration: none;
+  padding: 6px 12px;
+  opacity: 0.8;
+}
+
+/* MANGA GRID */
+.manga-grid-wrap {
+  padding: 28px 48px 0;
+}
+.manga-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.9fr;
+  grid-template-rows: 180px 180px 180px;
+  gap: 14px;
+  height: 580px;
+}
+.panel-art {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  border: var(--border);
+  background: var(--bg-alt);
+  position: relative;
+  overflow: hidden;
+}
+.panel-hero {
+  grid-column: 2 / span 2;
+  grid-row: 1 / span 2;
+  border: var(--border);
+  background: var(--bg);
+  padding: 32px 36px;
+  position: relative;
+  overflow: hidden;
+}
+.panel-hero-heading {
+  font-size: clamp(44px, 5vw, 72px);
+  margin-top: 18px;
+}
+.panel-voice {
+  grid-column: 2;
+  grid-row: 3;
+  border: var(--border);
+  background: var(--accent3);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+.panel-memory {
+  grid-column: 3;
+  grid-row: 3;
+  border: var(--border);
+  background: var(--accent);
+  color: var(--bg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+.panel-dialogue {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  right: 14px;
+  background: var(--bg);
+  border: var(--border);
+  padding: 14px 18px 16px;
+  box-shadow: var(--shadow-box);
+}
+.panel-dialogue-label {
+  position: absolute;
+  top: -13px;
+  left: 14px;
+  background: var(--accent3);
+  color: var(--fg);
+  padding: 2px 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: var(--border);
+}
+.panel-stamp {
+  position: absolute;
+  top: 16px;
+  right: 28px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid var(--accent2);
+  color: var(--accent2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  opacity: 0.85;
+  transform: rotate(12deg);
+}
+
+/* Dark theme panel overrides */
+:global(html.dark .panel-memory) {
+  background: var(--bg-alt);
+  color: var(--fg);
+}
+:global(html.dark .panel-memory p) {
+  color: var(--fg);
+}
+:global(html.dark .panel-voice) {
+  background: rgba(168, 117, 58, 0.22);
+}
+:global(html.dark .panel-voice p) {
+  color: var(--fg);
+}
+
+/* CTA BAR */
+.cta-bar {
+  padding: 20px 48px 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .landing-nav { padding: 12px 16px; gap: 8px; }
+  .landing-nav-links { gap: 8px; }
+  .nav-text-link { display: none; }
+
+  .manga-grid-wrap { padding: 16px 16px 0; }
+  .manga-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto;
+    height: auto;
+    gap: 10px;
+  }
+
+  /* Art panel: full width, portrait */
+  .panel-art {
+    grid-column: 1 / span 2;
+    grid-row: auto;
+    height: 260px;
+  }
+
+  /* Hero panel: full width, auto height */
+  .panel-hero {
+    grid-column: 1 / span 2;
+    grid-row: auto;
+    padding: 24px 20px;
+    overflow: visible;
+    height: auto;
+  }
+  .panel-hero-heading {
+    font-size: clamp(34px, 9vw, 52px);
+    margin-top: 12px;
+  }
+  .panel-stamp { width: 40px; height: 40px; font-size: 16px; top: 12px; right: 16px; }
+
+  /* Voice: left half */
+  .panel-voice {
+    grid-column: 1;
+    grid-row: auto;
+    justify-content: flex-start;
+    gap: 8px;
+    min-height: 110px;
+    overflow: visible;
+  }
+  /* Memory: right half */
+  .panel-memory {
+    grid-column: 2;
+    grid-row: auto;
+    justify-content: flex-start;
+    gap: 8px;
+    min-height: 110px;
+    overflow: visible;
+  }
+
+  .cta-bar { padding: 16px 16px 20px; }
+}
+
+@media (max-width: 480px) {
+  .panel-hero-heading { font-size: 30px; }
+  .panel-art { height: 220px; }
+}
+
+/* FEATURES section */
+section.features { padding: 48px 48px; border-top: var(--border); }
+@media (max-width: 768px) {
+  section.features { padding: 32px 16px; }
+}
+
+/* FOOTER */
+footer.landing-footer {
+  border-top: var(--border);
+  padding: 24px 48px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+@media (max-width: 768px) {
+  footer.landing-footer { padding: 20px 16px; }
+}
+</style>
