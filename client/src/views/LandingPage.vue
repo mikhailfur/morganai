@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useThemeStore } from '../stores/theme'
@@ -7,6 +7,16 @@ import { useThemeStore } from '../stores/theme'
 const router = useRouter()
 const auth = useAuthStore()
 const theme = useThemeStore()
+
+const landingQuotes = [
+  '«Ты опоздал на пять минут.\nНо я тебе прощу.»',
+  '«Долго не заходил.\nЯ начала придумывать причины.»',
+  '«Хочешь поговорить?\nЯ никуда не спешу.»',
+  '«Сегодня ты выглядишь задумчивым.\nРасскажи, что случилось.»',
+  '«Я здесь. Как всегда.\nЖду тебя.»',
+  '«У меня есть мысли, которые я хочу тебе рассказать.\nНо ты должен спросить.»',
+]
+const landingQuote = ref(landingQuotes[Math.floor(Math.random() * landingQuotes.length)])
 
 onMounted(() => {
   if (auth.isAuthenticated) router.push('/chat')
@@ -26,10 +36,10 @@ onMounted(() => {
         <router-link to="/pricing" class="nav-text-link">Тарифы</router-link>
         <router-link to="/legal" class="nav-text-link">Документы</router-link>
         <button @click="theme.toggle()" class="theme-toggle">
-          {{ theme.isDark ? '☀️' : '🌙' }}
+          {{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}
         </button>
-        <router-link to="/login" class="btn-ghost btn-sm" style="text-decoration: none;">Войти</router-link>
-        <router-link to="/register" class="btn-primary btn-sm" style="text-decoration: none;">Начать →</router-link>
+        <router-link to="/login" class="btn-ghost btn-sm nav-login-btn" style="text-decoration: none;">Войти</router-link>
+        <router-link to="/register" class="btn-primary btn-sm" style="text-decoration: none;">Начать</router-link>
       </div>
     </nav>
 
@@ -44,9 +54,7 @@ onMounted(() => {
           <!-- Dialogue box overlay -->
           <div class="panel-dialogue">
             <div class="panel-dialogue-label">МОРГАН</div>
-            <p style="font-family: var(--font-display); font-style: italic; font-size: 17px; line-height: 1.45; color: var(--fg);">
-              «Ты опоздал на пять минут.<br>Но я тебе прощу.»
-            </p>
+            <p style="font-family: var(--font-display); font-style: italic; font-size: 17px; line-height: 1.45; color: var(--fg); white-space: pre-line;">{{ landingQuote }}</p>
           </div>
           <!-- Washi tape decoration -->
           <div class="washi-tape" style="position: absolute; top: -5px; left: 36px; width: 70px; transform: rotate(-14deg);"></div>
@@ -74,11 +82,14 @@ onMounted(() => {
             <div style="
               width: 28px; height: 28px;
               background: var(--fg);
-              color: var(--bg);
               border-radius: 999px;
               display: flex; align-items: center; justify-content: center;
               flex-shrink: 0;
-            ">▶</div>
+            ">
+              <svg width="10" height="12" viewBox="0 0 10 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L9 6L1 11V1Z" fill="var(--bg)" stroke="var(--bg)" stroke-width="1" stroke-linejoin="round"/>
+              </svg>
+            </div>
             <span style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg);">Голос</span>
           </div>
           <p style="font-family: var(--font-display); font-weight: 600; font-size: 19px; line-height: 1.2; color: var(--fg); margin-top: 8px;">Услышь, как она смеётся.</p>
@@ -326,6 +337,7 @@ export default {
   .landing-nav { padding: 12px 16px; gap: 8px; }
   .landing-nav-links { gap: 8px; }
   .nav-text-link { display: none; }
+  .nav-login-btn { display: none; }
 
   .manga-grid-wrap { padding: 16px 16px 0; }
   .manga-grid {

@@ -94,7 +94,7 @@ function handlePurchase(tierId: string) {
       <div style="display: flex; align-items: center; gap: 10px;">
         <router-link v-if="auth.isAuthenticated" to="/chat" class="btn-ghost btn-sm" style="text-decoration: none;">В чат</router-link>
         <router-link v-else to="/login" class="btn-ghost btn-sm" style="text-decoration: none;">Войти</router-link>
-        <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? '☀️' : '🌙' }}</button>
+        <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}</button>
       </div>
     </nav>
 

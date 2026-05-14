@@ -74,7 +74,7 @@ const statCards = [
       </div>
       <div style="display: flex; gap: 10px; align-items: center;">
         <router-link to="/chat" class="btn-ghost btn-sm" style="text-decoration: none;">← Назад</router-link>
-        <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? '☀️' : '🌙' }}</button>
+        <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}</button>
       </div>
     </header>
 

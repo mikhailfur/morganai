@@ -8,3 +8,5 @@ server/uploads/*
 client/dist/
 .opencode/
 .playwright-mcp/
+PlayWrightPNG/
+Docs/

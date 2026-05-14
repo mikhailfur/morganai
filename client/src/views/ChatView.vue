@@ -21,6 +21,18 @@ const isMobile = ref(window.innerWidth < 768)
 const currentCharacter = computed(() => auth.user?.selected_character || 'morgan')
 const currentCharObj = computed(() => chat.characters.find(c => c.slug === currentCharacter.value))
 
+const chatGreetings = [
+  '«Ты опоздал. Но я готова простить — если напишешь что-нибудь интересное.»',
+  '«Снова ты. Я уже начала думать, что ты забыл обо мне.»',
+  '«Тишина утомляет. Скажи хоть что-нибудь.»',
+  '«О. Ты пришёл. Хорошо. Мне уже было скучно с моими мыслями.»',
+  '«Привет. Я тут. Куда уж деваться.»',
+  '«Долго ждала? Нет. Врать не стану — немного.»',
+  '«С чего начнём сегодня? У меня есть время и интерес.»',
+  '«Кажется, у тебя что-то на уме. Говори — я слушаю.»',
+]
+const randomGreeting = chatGreetings[Math.floor(Math.random() * chatGreetings.length)]
+
 onMounted(async () => {
   await chat.fetchCharacters()
   await chat.fetchHistory(currentCharacter.value)
@@ -66,10 +78,19 @@ function formatTime(ts?: number) {
   return new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
 }
 
-function formatContent(text: string) {
-  let out = text.replace(/\*([^*]+)\*/g, '<em style="color: var(--accent3); font-style: normal;">$1</em>')
-  out = out.replace(/\(([^)]+)\)/g, '<span style="opacity: 0.5; font-size: 0.85em; display: block; margin-top: 4px;">($1)</span>')
+function formatContent(raw: string) {
+  // Strip [VOICE: ...] tags — already handled as audio
+  let out = raw.replace(/\[VOICE:[^\]]*\]/g, '')
+
+  // 1. Thoughts (мысли в скобках) — run BEFORE italic so parens in CSS vars aren't touched
+  out = out.replace(/\(([^)]{2,})\)/g, '<span class="msg-thought">($1)</span>')
+
+  // 2. Actions *курсив* — use CSS class, no inline var() to avoid paren collision
+  out = out.replace(/\*([^*\n]+)\*/g, '<em class="msg-action">$1</em>')
+
+  // 3. Newlines
   out = out.replace(/\n/g, '<br>')
+
   return out
 }
 
@@ -94,7 +115,7 @@ async function switchCharacter(slug: string) {
 </script>
 
 <template>
-  <div style="height: 100vh; display: flex; background: var(--bg); color: var(--fg); overflow: hidden; position: relative;">
+  <div class="chat-root">
 
     <!-- Mobile overlay -->
     <div v-if="sidebarOpen" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 40;" @click="sidebarOpen = false" class="md-hidden" />
@@ -152,7 +173,7 @@ async function switchCharacter(slug: string) {
         <button @click="clearChat" class="nav-item" style="width: 100%; text-align: left; font-size: 13px; opacity: 0.7;">Очистить чат</button>
         <router-link v-if="auth.isAdmin" to="/admin" class="nav-item" style="text-decoration: none; display: block; font-size: 13px;">Админка</router-link>
         <button @click="theme.toggle()" class="nav-item" style="width: 100%; text-align: left; font-size: 13px; opacity: 0.7;">
-          {{ theme.isDark ? '☀️ Свет' : '🌙 Ночь' }}
+          {{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}
         </button>
         <button @click="auth.logout(); router.push('/')" class="nav-item" style="width: 100%; text-align: left; font-size: 13px; color: var(--accent2);">Выйти</button>
       </div>
@@ -226,7 +247,7 @@ async function switchCharacter(slug: string) {
               font-family: var(--font-ui); font-size: 11px; font-weight: 700;
             ">{{ currentCharObj?.name || 'МОРГАН' }}</div>
             <p style="font-family: var(--font-display); font-style: italic; font-size: 17px; line-height: 1.5; color: var(--fg);">
-              {{ currentCharObj?.greeting_message || '«Привет. Напиши что-нибудь — я жду.»' }}
+              {{ randomGreeting }}
             </p>
           </div>
           <p style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg); opacity: 0.4;">Напиши первое сообщение</p>
@@ -265,25 +286,19 @@ async function switchCharacter(slug: string) {
         <div style="display: flex; align-items: flex-end; gap: 10px; max-width: 860px; margin: 0 auto;">
           <input ref="fileInput" type="file" accept="image/*" style="display: none;" @change="handleFileUpload" />
 
-          <button @click="triggerFileUpload" style="
-            width: 40px; height: 40px; flex-shrink: 0;
-            display: flex; align-items: center; justify-content: center;
-            border: var(--border);
-            background: var(--bg-alt);
-            cursor: pointer;
-            font-size: 16px;
-            transition: background 0.15s;
-          " title="Загрузить фото">📷</button>
+          <button @click="triggerFileUpload" class="chat-icon-btn" title="Загрузить фото">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </button>
 
-          <button @click="isRecording = !isRecording" :style="{
-            width: '40px', height: '40px', flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: 'var(--border)',
-            background: isRecording ? 'var(--accent)' : 'var(--bg-alt)',
-            cursor: 'pointer',
-            fontSize: '16px',
-            transition: 'background 0.15s',
-          }" title="Голосовое сообщение">🎤</button>
+          <button @click="isRecording = !isRecording" class="chat-icon-btn" :class="{ active: isRecording }" title="Голосовое сообщение">
+            <svg width="14" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/>
+            </svg>
+          </button>
 
           <textarea
             v-model="messageInput"
@@ -380,6 +395,50 @@ async function switchCharacter(slug: string) {
 </template>
 
 <style scoped>
+/* Root layout — dvh for proper mobile browser chrome handling */
+.chat-root {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  background: var(--bg);
+  color: var(--fg);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Input icon buttons */
+.chat-icon-btn {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--border);
+  background: var(--bg-alt);
+  color: var(--fg);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.chat-icon-btn:hover { background: var(--rule); }
+.chat-icon-btn.active { background: var(--accent); color: var(--bg); }
+
+/* Message formatting */
+:global(.msg-action) {
+  color: var(--accent3);
+  font-style: italic;
+  font-family: var(--font-display);
+  display: block;
+  margin-bottom: 2px;
+}
+:global(.msg-thought) {
+  opacity: 0.5;
+  font-size: 0.88em;
+  display: block;
+  margin-top: 4px;
+  font-style: italic;
+}
+
 @media (max-width: 768px) {
   aside { position: fixed !important; }
   .mobile-menu-btn { display: flex !important; }

@@ -95,7 +95,7 @@ function handleOAuth(provider: string) {
           <span style="font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--accent);">Morgan</span>
           <span style="font-family: var(--font-display); font-size: 12px; color: var(--accent2);">夢</span>
         </router-link>
-        <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? '☀️' : '🌙' }}</button>
+        <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}</button>
       </div>
 
       <div class="editorial-label animate-fade-in" style="color: var(--accent2);">

@@ -43,7 +43,7 @@ function handleOAuth(provider: string) {
           Уже есть аккаунт?
           <router-link to="/login" style="color: var(--accent); font-weight: 600; text-decoration: underline;">Войти</router-link>
         </span>
-        <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? '☀️' : '🌙' }}</button>
+        <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}</button>
       </div>
     </div>
 

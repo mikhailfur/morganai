@@ -154,7 +154,7 @@ const activeDoc = computed(() => docs.find(d => d.id === activeDocId.value) || d
         <router-link to="/" style="color: inherit; text-decoration: none; opacity: 0.7;">Главная</router-link>
         <span style="font-weight: 600; color: var(--accent);">Правовые документы</span>
         <a href="mailto:support@morgan.ai" style="color: inherit; text-decoration: none; opacity: 0.7;">Поддержка</a>
-        <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? '☀️' : '🌙' }}</button>
+        <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}</button>
       </div>
     </header>
 

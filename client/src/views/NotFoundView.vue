@@ -95,7 +95,7 @@ const theme = useThemeStore()
 
     <!-- Theme toggle -->
     <button @click="theme.toggle()" class="theme-toggle" style="margin-top: 24px;">
-      {{ theme.isDark ? '☀️ Свет' : '🌙 Ночь' }}
+      {{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}
     </button>
 
   </div>

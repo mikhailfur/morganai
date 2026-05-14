@@ -513,17 +513,18 @@ html.dark {
   .theme-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 6px 10px;
+    padding: 6px 12px;
     border: var(--border);
     cursor: pointer;
-    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", var(--font-ui), system-ui, sans-serif;
-    font-size: 15px;
-    letter-spacing: 0;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    white-space: nowrap;
     background: transparent;
     color: var(--fg);
     transition: background 0.15s;
-    line-height: 1;
+    font-weight: 600;
   }
   .theme-toggle:hover {
     background: var(--bg-alt);
