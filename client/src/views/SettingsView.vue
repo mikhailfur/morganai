@@ -18,12 +18,6 @@ async function setMode(mode: string) {
   await auth.updateSettings({ behavior_mode: mode })
 }
 
-const navItems = [
-  { n: 'Чат', to: '/chat' },
-  { n: 'Тарифы', to: '/pricing' },
-  { n: 'Настройки', to: '/settings', active: true },
-  { n: 'Выйти', action: 'logout' },
-]
 </script>
 
 <template>

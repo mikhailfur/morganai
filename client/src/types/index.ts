@@ -8,6 +8,7 @@ export interface User {
   selected_character: string;
   avatar_url?: string;
   total_messages?: number;
+  voice_count_today?: number;
   created_at?: number;
 }
 
@@ -29,6 +30,7 @@ export interface Character {
   description: string;
   avatar_url?: string;
   is_premium: boolean;
+  greeting_message?: string;
 }
 
 export interface AuthResponse {

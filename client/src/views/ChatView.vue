@@ -16,6 +16,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const isRecording = ref(false)
 const sidebarOpen = ref(false)
 const showModes = ref(false)
+const isMobile = ref(window.innerWidth < 768)
 
 const currentCharacter = computed(() => auth.user?.selected_character || 'morgan')
 const currentCharObj = computed(() => chat.characters.find(c => c.slug === currentCharacter.value))
@@ -106,10 +107,10 @@ async function switchCharacter(slug: string) {
       flexDirection: 'column',
       borderRight: 'var(--border)',
       background: 'var(--bg-alt)',
-      position: window.innerWidth < 768 ? 'fixed' : 'relative',
+      position: isMobile ? 'fixed' : 'relative',
       top: 0, bottom: 0, left: 0,
       zIndex: 50,
-      transform: (window.innerWidth < 768 && !sidebarOpen) ? 'translateX(-100%)' : 'translateX(0)',
+      transform: (isMobile && !sidebarOpen) ? 'translateX(-100%)' : 'translateX(0)',
       transition: 'transform 0.25s',
     }">
       <!-- Logo -->
