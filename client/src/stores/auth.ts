@@ -6,33 +6,34 @@ const API = '/api';
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null);
-  const token = ref<string | null>(localStorage.getItem('morgan_token'));
   const loading = ref(false);
 
-  const isAuthenticated = computed(() => !!token.value && !!user.value);
+  const isAuthenticated = computed(() => !!user.value);
   const isAdmin = computed(() => user.value?.is_admin ?? false);
   const isPremium = computed(() => user.value?.is_premium ?? false);
+  const isKycVerified = computed(() => user.value?.kyc_verified ?? false);
+  const canNsfw = computed(() => isPremium.value || isKycVerified.value);
 
-  function setAuth(t: string, u: User) {
-    token.value = t;
-    user.value = u;
-    localStorage.setItem('morgan_token', t);
-  }
-
-  function headers() {
-    return { 'Content-Type': 'application/json', Authorization: `Bearer ${token.value}` };
+  async function fetchUser() {
+    try {
+      const res = await fetch(`${API}/auth/me`, { credentials: 'include' });
+      if (!res.ok) { user.value = null; return; }
+      user.value = await res.json();
+    } catch { user.value = null; }
   }
 
   async function register(email: string, username: string, password: string) {
     loading.value = true;
     try {
       const res = await fetch(`${API}/auth/register`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, username, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setAuth(data.token, data.user);
+      user.value = data.user;
       return data;
     } finally { loading.value = false; }
   }
@@ -41,42 +42,104 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true;
     try {
       const res = await fetch(`${API}/auth/login`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setAuth(data.token, data.user);
+      user.value = data.user;
       return data;
     } finally { loading.value = false; }
   }
 
-  async function fetchUser() {
-    if (!token.value) return;
+  async function loginWithGoogle(idToken: string) {
+    loading.value = true;
     try {
-      const res = await fetch(`${API}/auth/me`, { headers: headers() });
-      if (!res.ok) { logout(); return; }
-      user.value = await res.json();
-    } catch { logout(); }
+      const res = await fetch(`${API}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ idToken }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      user.value = data.user;
+      return data;
+    } finally { loading.value = false; }
   }
 
-  function logout() {
-    token.value = null;
+  async function loginWithTelegram(telegramData: Record<string, any>) {
+    loading.value = true;
+    try {
+      const res = await fetch(`${API}/auth/telegram`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(telegramData),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      user.value = data.user;
+      return data;
+    } finally { loading.value = false; }
+  }
+
+  async function logout() {
+    await fetch(`${API}/auth/logout`, { method: 'POST', credentials: 'include' });
     user.value = null;
-    localStorage.removeItem('morgan_token');
   }
 
   async function updateSettings(settings: Partial<{ behavior_mode: string; selected_character: string }>) {
     const res = await fetch(`${API}/user/settings`, {
-      method: 'PUT', headers: headers(),
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(settings),
     });
     const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
     if (user.value) {
       if (data.behavior_mode) user.value.behavior_mode = data.behavior_mode;
       if (data.selected_character) user.value.selected_character = data.selected_character;
     }
   }
 
-  return { user, token, loading, isAuthenticated, isAdmin, isPremium, register, login, fetchUser, logout, updateSettings, headers };
+  async function verifyKyc() {
+    const res = await fetch(`${API}/user/kyc-verify`, { method: 'POST', credentials: 'include' });
+    if (res.ok && user.value) user.value.kyc_verified = true;
+  }
+
+  async function changePassword(currentPassword: string, newPassword: string) {
+    const res = await fetch(`${API}/user/change-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+  }
+
+  async function deleteAccount(password: string) {
+    const res = await fetch(`${API}/user/account`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    user.value = null;
+    return data;
+  }
+
+  return {
+    user, loading,
+    isAuthenticated, isAdmin, isPremium, isKycVerified, canNsfw,
+    fetchUser, register, login, loginWithGoogle, loginWithTelegram, logout,
+    updateSettings, verifyKyc, changePassword, deleteAccount,
+  };
 });

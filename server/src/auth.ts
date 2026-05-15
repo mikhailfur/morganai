@@ -29,20 +29,37 @@ export const verifyToken = (token: string): JwtPayload => {
   return jwt.verify(token, config.jwtSecret) as JwtPayload;
 };
 
+export const COOKIE_NAME = 'morgan_token';
+
+export const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  path: '/',
+};
+
 export const authMiddleware = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
+    // Try cookie first, then Authorization header for backward compat
+    const cookieToken = (req as any).cookies?.[COOKIE_NAME];
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = cookieToken || (authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
+
+    if (!token) {
       res.status(401).json({ error: 'Необходима авторизация' });
       return;
     }
 
-    const token = authHeader.split(' ')[1];
     const payload = verifyToken(token);
-    
     const user = await database.getUserById(payload.userId);
     if (!user) {
       res.status(401).json({ error: 'Пользователь не найден' });
+      return;
+    }
+
+    if (user.is_banned) {
+      res.status(403).json({ error: 'Аккаунт заблокирован' });
       return;
     }
 

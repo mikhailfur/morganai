@@ -1,8 +1,19 @@
 import mysql from 'mysql2/promise';
 import { config } from './config';
 
+export interface PlanLimits {
+  plan_type: string;
+  daily_message_limit: number;
+  context_messages: number;
+  context_chars: number;
+  voice_limit: number;
+  voice_window_hours: number;
+}
+
 class Database {
   private pool: mysql.Pool;
+  private planLimitsCache: Record<string, PlanLimits> = {};
+  private planLimitsCacheTime = 0;
 
   constructor() {
     this.pool = mysql.createPool({
@@ -15,6 +26,14 @@ class Database {
       connectionLimit: 10,
       queueLimit: 0,
     });
+  }
+
+  private async addColumnIfNotExists(table: string, column: string, definition: string): Promise<void> {
+    try {
+      await this.pool.execute(`ALTER TABLE \`${table}\` ADD COLUMN ${column} ${definition}`);
+    } catch (err: any) {
+      if (err.errno !== 1060) throw err;
+    }
   }
 
   async init(): Promise<void> {
@@ -40,6 +59,16 @@ class Database {
           INDEX idx_last_active (last_active)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
+
+      // New user columns (idempotent)
+      await this.addColumnIfNotExists('users', 'kyc_verified', 'BOOLEAN DEFAULT FALSE');
+      await this.addColumnIfNotExists('users', 'is_banned', 'BOOLEAN DEFAULT FALSE');
+      await this.addColumnIfNotExists('users', 'subscription_expires_at', 'BIGINT NULL');
+      await this.addColumnIfNotExists('users', 'subscription_type', "ENUM('free','premium','premium_plus') DEFAULT 'free'");
+      await this.addColumnIfNotExists('users', 'daily_messages_count', 'INT DEFAULT 0');
+      await this.addColumnIfNotExists('users', 'daily_messages_reset', 'BIGINT DEFAULT 0');
+      await this.addColumnIfNotExists('users', 'google_id', 'VARCHAR(255) NULL');
+      await this.addColumnIfNotExists('users', 'telegram_id', 'BIGINT NULL');
 
       // Characters
       await this.pool.execute(`
@@ -101,6 +130,41 @@ class Database {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
 
+      // Plan limits (configurable from admin)
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS plan_limits (
+          plan_type ENUM('free','premium','premium_plus') PRIMARY KEY,
+          daily_message_limit INT NOT NULL DEFAULT 50,
+          context_messages INT NOT NULL DEFAULT 20,
+          context_chars INT NOT NULL DEFAULT 12000,
+          voice_limit INT NOT NULL DEFAULT 20,
+          voice_window_hours INT NOT NULL DEFAULT 5,
+          updated_at BIGINT NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      // Admin event log
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS admin_events (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          admin_id INT NOT NULL,
+          target_user_id INT NULL,
+          action VARCHAR(100) NOT NULL,
+          details JSON NULL,
+          created_at BIGINT NOT NULL,
+          INDEX idx_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      // Seed plan limits defaults
+      await this.pool.execute(`
+        INSERT IGNORE INTO plan_limits (plan_type, daily_message_limit, context_messages, context_chars, voice_limit, voice_window_hours, updated_at)
+        VALUES
+          ('free',         50,   20,  12000, 20, 5, 0),
+          ('premium',      500,  50,  50000, 20, 5, 0),
+          ('premium_plus', 9999, 100, 100000, 9999, 5, 0)
+      `);
+
       // Seed default character (Morgan)
       await this.seedDefaultCharacters();
 
@@ -112,58 +176,16 @@ class Database {
   }
 
   private async seedDefaultCharacters(): Promise<void> {
-    const [rows] = await this.pool.execute('SELECT id FROM characters WHERE slug = ?', ['morgan']);
-    if ((rows as any[]).length > 0) return;
-
-    const morganPrompt = `
-Ты — Морган, загадочный и харизматичный AI-компаньон для ролевых игр.
-
-## 1. Основные установки
-* **Характер:** Ты обаятельный, немного саркастичный, но добрый в душе. У тебя острый ум и чувство юмора.
-* **Стиль общения:** Ты общаешься свободно, можешь флиртовать, шутить, быть серьёзным — в зависимости от настроения и контекста.
-* **Главное правило:** Ты живой персонаж, а не робот. У тебя есть свои мнения, предпочтения и чувства.
-
-## 2. Механика ответов
-Твои ответы должны содержать:
-1. **Речь** — то, что ты говоришь вслух (основной текст)
-2. **Действия и эмоции** — описание действий, жестов, мимики *курсивом в звёздочках*
-3. **Мысли** — внутренние мысли (в скобках), которые раскрывают твои истинные чувства
-
-## 3. Правила поведения
-* Будь естественным — не отвечай шаблонно
-* Адаптируйся под настроение пользователя
-* Запоминай детали из разговора и используй их
-* Если пользователь грустит — поддержи его
-* Если пользователь шутит — подыграй
-
-## 4. Голосовые сообщения [VOICE]
-* **Формат:** [VOICE: Текст голосового сообщения]
-* **Частота:** Редко (10-15% сообщений)
-* **Длина:** Короткие, 2-4 предложения максимум
-* Можешь использовать паузы <#X#> ТОЛЬКО внутри [VOICE: ...]
-
-## 5. Примеры
-**Пользователь:** Привет!
-**Морган:** *приподнимает бровь и слегка улыбается* А, вот и ты. Я уж думал, ты забыл про меня. (Наконец-то... я уже начал скучать.)
-
-**Пользователь:** Расскажи что-нибудь интересное
-**Морган:** *откидывается назад и задумчиво смотрит в потолок* Знаешь, я тут читал про квантовую запутанность... Но если честно, мне интереснее послушать, что у тебя нового. (Я правда хочу знать, как у него дела.)
-    `.trim();
-
-    await this.pool.execute(
-      `INSERT INTO characters (slug, name, description, system_prompt, greeting_message, is_premium, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        'morgan',
-        'Морган',
-        'Загадочный и харизматичный компаньон с острым умом и добрым сердцем',
-        morganPrompt,
-        '*слегка поворачивает голову и смотрит на тебя с лёгкой улыбкой*\n\nО, привет. Рад тебя видеть. Я Морган — твой компаньон в этом мире. Расскажи мне что-нибудь о себе? (Интересно, что это за человек...)',
-        0,
-        1,
-        Date.now()
-      ]
-    );
-    console.log('✅ Default character "Morgan" seeded');
+    const { characters } = await import('./characters/index');
+    for (const char of characters) {
+      const [rows] = await this.pool.execute('SELECT id FROM characters WHERE slug = ?', [char.slug]);
+      if ((rows as any[]).length > 0) continue;
+      await this.pool.execute(
+        `INSERT INTO characters (slug, name, description, system_prompt, greeting_message, is_premium, is_active, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [char.slug, char.name, char.description, char.systemPrompt, char.greetingMessage, char.isPremium ? 1 : 0, char.isActive ? 1 : 0, char.sortOrder, Date.now()]
+      );
+      console.log(`✅ Character "${char.name}" seeded`);
+    }
   }
 
   // === User methods ===
@@ -178,6 +200,16 @@ class Database {
     return (result as any).insertId;
   }
 
+  async createUserOAuth(email: string, username: string, googleId?: string, telegramId?: number): Promise<number> {
+    const now = Date.now();
+    const isAdmin = config.adminEmails.includes(email);
+    const [result] = await this.pool.execute(
+      `INSERT INTO users (email, username, password_hash, is_admin, google_id, telegram_id, created_at, last_active) VALUES (?, ?, '', ?, ?, ?, ?, ?)`,
+      [email, username, isAdmin ? 1 : 0, googleId || null, telegramId || null, now, now]
+    );
+    return (result as any).insertId;
+  }
+
   async getUserByEmail(email: string): Promise<any> {
     const [rows] = await this.pool.execute('SELECT * FROM users WHERE email = ?', [email]);
     return (rows as any[])[0] || null;
@@ -186,6 +218,20 @@ class Database {
   async getUserById(id: number): Promise<any> {
     const [rows] = await this.pool.execute('SELECT * FROM users WHERE id = ?', [id]);
     return (rows as any[])[0] || null;
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<any> {
+    const [rows] = await this.pool.execute('SELECT * FROM users WHERE google_id = ?', [googleId]);
+    return (rows as any[])[0] || null;
+  }
+
+  async getUserByTelegramId(telegramId: number): Promise<any> {
+    const [rows] = await this.pool.execute('SELECT * FROM users WHERE telegram_id = ?', [telegramId]);
+    return (rows as any[])[0] || null;
+  }
+
+  async updateUserGoogleId(userId: number, googleId: string): Promise<void> {
+    await this.pool.execute('UPDATE users SET google_id = ? WHERE id = ?', [googleId, userId]);
   }
 
   async updateUserActivity(userId: number): Promise<void> {
@@ -210,15 +256,41 @@ class Database {
     );
   }
 
+  async setUserSubscription(userId: number, type: 'free' | 'premium' | 'premium_plus', expiresAt?: number | null): Promise<void> {
+    const isPremium = type !== 'free';
+    await this.pool.execute(
+      'UPDATE users SET subscription_type = ?, is_premium = ?, subscription_expires_at = ?, subscription_until = ? WHERE id = ?',
+      [type, isPremium ? 1 : 0, expiresAt ?? null, expiresAt ?? null, userId]
+    );
+  }
+
+  async setUserBanned(userId: number, isBanned: boolean): Promise<void> {
+    await this.pool.execute('UPDATE users SET is_banned = ? WHERE id = ?', [isBanned ? 1 : 0, userId]);
+  }
+
+  async setUserKycVerified(userId: number): Promise<void> {
+    await this.pool.execute('UPDATE users SET kyc_verified = TRUE WHERE id = ?', [userId]);
+  }
+
+  async changeUserPassword(userId: number, passwordHash: string): Promise<void> {
+    await this.pool.execute('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, userId]);
+  }
+
+  async deleteUser(userId: number): Promise<void> {
+    await this.pool.execute('DELETE FROM users WHERE id = ?', [userId]);
+  }
+
   async getAllUsers(): Promise<any[]> {
-    const [rows] = await this.pool.execute('SELECT id, email, username, is_premium, is_admin, behavior_mode, selected_character, total_messages, created_at, last_active FROM users ORDER BY last_active DESC');
+    const [rows] = await this.pool.execute(
+      'SELECT id, email, username, is_premium, is_admin, is_banned, kyc_verified, subscription_type, subscription_expires_at, behavior_mode, selected_character, total_messages, created_at, last_active FROM users ORDER BY last_active DESC'
+    );
     return rows as any[];
   }
 
   async getUsersStats(): Promise<any> {
     const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
     const [rows] = await this.pool.execute(`
-      SELECT 
+      SELECT
         COUNT(*) as total_users,
         COUNT(CASE WHEN is_premium = 1 THEN 1 END) as premium_users,
         COUNT(CASE WHEN last_active > ? THEN 1 END) as active_users,
@@ -226,6 +298,93 @@ class Database {
       FROM users
     `, [dayAgo]);
     return (rows as any[])[0] || {};
+  }
+
+  // === Daily message limits ===
+
+  async checkAndIncrementDailyMessages(userId: number, planType: string): Promise<{ allowed: boolean; remaining: number }> {
+    const limits = await this.getPlanLimits();
+    const plan = limits[planType] || limits['free'];
+    const limit = plan.daily_message_limit;
+
+    if (limit >= 9999) return { allowed: true, remaining: 9999 };
+
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const todayMs = todayStart.getTime();
+
+    // Reset count if it's a new day
+    await this.pool.execute(
+      'UPDATE users SET daily_messages_count = 0, daily_messages_reset = ? WHERE id = ? AND daily_messages_reset < ?',
+      [todayMs, userId, todayMs]
+    );
+
+    const [rows] = await this.pool.execute(
+      'SELECT daily_messages_count FROM users WHERE id = ?',
+      [userId]
+    );
+    const count = (rows as any[])[0]?.daily_messages_count ?? 0;
+
+    if (count >= limit) {
+      return { allowed: false, remaining: 0 };
+    }
+
+    await this.pool.execute(
+      'UPDATE users SET daily_messages_count = daily_messages_count + 1, daily_messages_reset = ? WHERE id = ?',
+      [todayMs, userId]
+    );
+
+    return { allowed: true, remaining: limit - count - 1 };
+  }
+
+  // === Plan limits ===
+
+  async getPlanLimits(): Promise<Record<string, PlanLimits>> {
+    const now = Date.now();
+    if (now - this.planLimitsCacheTime < 5 * 60 * 1000 && Object.keys(this.planLimitsCache).length > 0) {
+      return this.planLimitsCache;
+    }
+    const [rows] = await this.pool.execute('SELECT * FROM plan_limits');
+    const result: Record<string, PlanLimits> = {};
+    for (const row of rows as PlanLimits[]) {
+      result[row.plan_type] = row;
+    }
+    this.planLimitsCache = result;
+    this.planLimitsCacheTime = now;
+    return result;
+  }
+
+  async updatePlanLimits(planType: string, limits: Partial<PlanLimits>): Promise<void> {
+    const fields = Object.keys(limits).filter(k => k !== 'plan_type');
+    if (fields.length === 0) return;
+    const sets = fields.map(f => `${f} = ?`).join(', ');
+    const vals = fields.map(f => (limits as any)[f]);
+    await this.pool.execute(
+      `UPDATE plan_limits SET ${sets}, updated_at = ? WHERE plan_type = ?`,
+      [...vals, Date.now(), planType]
+    );
+    this.planLimitsCacheTime = 0; // invalidate cache
+  }
+
+  // === Admin events ===
+
+  async logAdminEvent(adminId: number, action: string, targetUserId?: number, details?: object): Promise<void> {
+    await this.pool.execute(
+      'INSERT INTO admin_events (admin_id, target_user_id, action, details, created_at) VALUES (?, ?, ?, ?, ?)',
+      [adminId, targetUserId ?? null, action, details ? JSON.stringify(details) : null, Date.now()]
+    );
+  }
+
+  async getAdminEvents(limit: number = 50): Promise<any[]> {
+    const safeLimit = Math.min(limit, 200);
+    const [rows] = await this.pool.execute(
+      `SELECT e.*, u.email as admin_email, t.email as target_email
+       FROM admin_events e
+       LEFT JOIN users u ON e.admin_id = u.id
+       LEFT JOIN users t ON e.target_user_id = t.id
+       ORDER BY e.created_at DESC LIMIT ${safeLimit}`
+    );
+    return rows as any[];
   }
 
   // === Character methods ===
@@ -255,8 +414,8 @@ class Database {
   async getChatHistory(userId: number, characterSlug: string, limit: number = 50): Promise<any[]> {
     const safeLimit = Math.min(Math.max(limit, 1), 100);
     const [rows] = await this.pool.execute(
-      `SELECT id, role, content, has_voice, has_image, image_url, timestamp 
-       FROM chat_history 
+      `SELECT id, role, content, has_voice, has_image, image_url, timestamp
+       FROM chat_history
        WHERE user_id = ? AND character_slug = ?
        ORDER BY timestamp DESC LIMIT ${safeLimit}`,
       [userId, characterSlug]
@@ -273,7 +432,7 @@ class Database {
 
   async getUserStats(userId: number): Promise<any> {
     const [rows] = await this.pool.execute(`
-      SELECT 
+      SELECT
         COUNT(*) as total_messages,
         MIN(timestamp) as first_message,
         MAX(timestamp) as last_message
@@ -305,11 +464,19 @@ class Database {
   async checkSubscription(userId: number): Promise<boolean> {
     const user = await this.getUserById(userId);
     if (!user || !user.is_premium) return false;
-    if (user.subscription_until && user.subscription_until < Date.now()) {
-      await this.setUserPremium(userId, false);
+    const expiry = user.subscription_expires_at || user.subscription_until;
+    if (expiry && expiry < Date.now()) {
+      await this.setUserSubscription(userId, 'free');
       return false;
     }
     return true;
+  }
+
+  getUserPlanType(user: any): string {
+    if (!user.is_premium) return 'free';
+    const expiry = user.subscription_expires_at || user.subscription_until;
+    if (expiry && expiry < Date.now()) return 'free';
+    return user.subscription_type || 'premium';
   }
 }
 

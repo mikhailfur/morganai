@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
 import { config, validateConfig } from './config';
@@ -14,10 +15,9 @@ import adminRoutes from './routes/admin.routes';
 
 const app = express();
 
-// Middleware
-// Allow wildcard (*) or specific origin; JWT in headers — credentials not needed for cross-origin
 const corsOrigin: string | boolean = config.clientUrl === '*' ? true : config.clientUrl;
 app.use(cors({ origin: corsOrigin, credentials: true }));
+app.use(cookieParser());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
@@ -38,7 +38,7 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });
 });
 
-// Serve built frontend (production: public/ folder exists next to dist/)
+// Serve built frontend
 const publicPath = path.join(__dirname, '..', 'public');
 if (fs.existsSync(publicPath)) {
   app.use(express.static(publicPath));
@@ -47,10 +47,9 @@ if (fs.existsSync(publicPath)) {
   });
 }
 
-// Start server
 async function start() {
   validateConfig();
-  
+
   try {
     await database.init();
     console.log('✅ Database connected');

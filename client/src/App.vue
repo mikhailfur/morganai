@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
 import { useThemeStore } from './stores/theme'
+import CookieBanner from './components/CookieBanner.vue'
 
-// Initialize theme on app mount
 useThemeStore()
 </script>
 
 <template>
   <RouterView />
+  <CookieBanner />
 </template>

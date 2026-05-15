@@ -22,9 +22,46 @@ async function handleLogin() {
   }
 }
 
-function handleOAuth(provider: string) {
-  // Placeholder — OAuth not yet implemented
-  error.value = `Авторизация через ${provider} — скоро`
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
+async function handleGoogleOAuth() {
+  if (!GOOGLE_CLIENT_ID) {
+    error.value = 'Google OAuth не настроен — см. Docs/google-oauth-setup.md'
+    return
+  }
+  try {
+    const { google } = window as any
+    if (!google) {
+      const script = document.createElement('script')
+      script.src = 'https://accounts.google.com/gsi/client'
+      document.head.appendChild(script)
+      await new Promise(r => script.onload = r)
+    }
+    (window as any).google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: async ({ credential }: { credential: string }) => {
+        try {
+          await auth.loginWithGoogle(credential)
+          router.push('/chat')
+        } catch (e: any) { error.value = e.message }
+      },
+    });
+    (window as any).google.accounts.id.prompt()
+  } catch (e: any) {
+    error.value = 'Ошибка Google авторизации'
+  }
+}
+
+async function handleTelegramOAuth() {
+  error.value = 'Telegram: войдите через виджет ниже (см. Docs/telegram-oauth-setup.md)'
+}
+
+// Telegram widget callback (called by widget script)
+;(window as any).onTelegramAuth = async (user: Record<string, any>) => {
+  try {
+    await auth.loginWithTelegram(user)
+    router.push('/chat')
+  } catch (e: any) { error.value = (e as any).message }
 }
 </script>
 
@@ -154,11 +191,11 @@ function handleOAuth(provider: string) {
 
       <!-- OAuth -->
       <div style="margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;" class="animate-fade-in-3">
-        <button @click="handleOAuth('Google')" class="btn-ghost" style="padding: 12px;">
+        <button @click="handleGoogleOAuth" class="btn-ghost" style="padding: 12px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
           Google
         </button>
-        <button @click="handleOAuth('Telegram')" class="btn-ghost" style="padding: 12px;">
+        <button @click="handleTelegramOAuth" class="btn-ghost" style="padding: 12px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--accent2)"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.17 13.7l-2.94-.916c-.64-.203-.654-.64.135-.949l11.566-4.461c.537-.194 1.006.131.963.847z"/></svg>
           Telegram
         </button>

@@ -20,7 +20,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
-  if (auth.token && !auth.user) await auth.fetchUser();
+  if (!auth.user) await auth.fetchUser();
   if (to.meta.requiresAuth && !auth.isAuthenticated) return '/login';
   if (to.meta.requiresAdmin && !auth.isAdmin) return '/chat';
 });

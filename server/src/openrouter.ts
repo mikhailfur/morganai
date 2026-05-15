@@ -27,7 +27,7 @@ export class OpenRouterClient {
     const { maxTokens = 2048, temperature = 0.85 } = options;
 
     const requestMessages: ChatMessage[] = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] as any },
       ...messages,
     ];
 
@@ -70,7 +70,7 @@ export class OpenRouterClient {
     const { maxTokens = 2048, temperature = 0.85 } = options;
 
     const requestMessages: ChatMessage[] = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] as any },
       ...messages,
     ];
 

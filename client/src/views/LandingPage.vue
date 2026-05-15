@@ -142,12 +142,7 @@ onMounted(() => {
         ВОЗМОЖНОСТИ
       </div>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0;">
-        <div v-for="(f, i) in features" :key="f.title" style="
-          padding: 24px;
-          border: var(--border);
-          border-left: none;
-          background: var(--bg);
-        " :style="i === 0 ? 'border-left: var(--border)' : ''">
+        <div v-for="(f, i) in features" :key="f.title" class="feature-card" :style="{ borderLeft: i === 0 ? 'var(--border)' : 'none' }">
           <div style="font-family: var(--font-display); font-size: 32px; color: var(--accent2); margin-bottom: 12px;">{{ f.icon }}</div>
           <div style="font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--accent); margin-bottom: 8px;">{{ f.title }}</div>
           <div style="font-family: var(--font-ui); font-size: 14px; color: var(--fg); opacity: 0.75; line-height: 1.5;">{{ f.desc }}</div>
@@ -398,8 +393,14 @@ export default {
 
 /* FEATURES section */
 section.features { padding: 48px 48px; border-top: var(--border); }
+.feature-card {
+  padding: 24px;
+  border: var(--border);
+  background: var(--bg);
+}
 @media (max-width: 768px) {
   section.features { padding: 32px 16px; }
+  .feature-card { border-left: var(--border) !important; }
 }
 
 /* FOOTER */

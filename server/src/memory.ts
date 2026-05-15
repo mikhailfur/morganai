@@ -4,25 +4,31 @@ export interface HistoryMessage {
 }
 
 export class MemoryManager {
-  private readonly maxHistoryLength = 20;
-  private readonly maxContextChars = 12000;
-
-  formatChatHistory(history: { role: string; content: string }[]): HistoryMessage[] {
+  formatChatHistory(
+    history: { role: string; content: string }[],
+    maxMessages: number = 20,
+    maxChars: number = 12000
+  ): HistoryMessage[] {
     if (!history || history.length === 0) return [];
-    const recent = history.slice(-this.maxHistoryLength);
+    const recent = history.slice(-maxMessages);
     const result: HistoryMessage[] = [];
     let totalLength = 0;
     for (const msg of recent) {
       if (!msg || !msg.content) continue;
-      if (totalLength + msg.content.length > this.maxContextChars) break;
+      if (totalLength + msg.content.length > maxChars) break;
       result.push({ role: msg.role as 'user' | 'assistant', content: msg.content });
       totalLength += msg.content.length;
     }
     return result;
   }
 
-  buildMessages(history: { role: string; content: string }[], currentMessage: string): HistoryMessage[] {
-    const formatted = this.formatChatHistory(history);
+  buildMessages(
+    history: { role: string; content: string }[],
+    currentMessage: string,
+    maxMessages: number = 20,
+    maxChars: number = 12000
+  ): HistoryMessage[] {
+    const formatted = this.formatChatHistory(history, maxMessages, maxChars);
     formatted.push({ role: 'user', content: currentMessage.trim() });
     return formatted;
   }

@@ -10,6 +10,10 @@ export interface User {
   total_messages?: number;
   voice_count_today?: number;
   created_at?: number;
+  kyc_verified?: boolean;
+  subscription_type?: 'free' | 'premium' | 'premium_plus';
+  subscription_expires_at?: number | null;
+  is_banned?: boolean;
 }
 
 export interface ChatMessage {
@@ -34,6 +38,5 @@ export interface Character {
 }
 
 export interface AuthResponse {
-  token: string;
   user: User;
 }

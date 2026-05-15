@@ -63,6 +63,23 @@ html.dark {
     transition: background 0.25s, color 0.25s;
   }
 
+  /* Theme switch overlay */
+  .theme-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    transform: translateY(-100%);
+    pointer-events: none;
+  }
+  .theme-overlay--in {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(0);
+  }
+  .theme-overlay--out {
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(100%);
+  }
+
   ::selection {
     background: var(--accent3);
     color: var(--fg);
@@ -509,16 +526,16 @@ html.dark {
     background: linear-gradient(180deg, transparent 0%, var(--bg) 85%);
   }
 
-  /* Theme toggle */
+  /* Theme toggle — same height as .btn-ghost.btn-sm */
   .theme-toggle {
     display: inline-flex;
     align-items: center;
-    padding: 6px 12px;
+    padding: 8px 16px;
     border: var(--border);
     cursor: pointer;
     font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 1.6px;
+    font-size: 12px;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     white-space: nowrap;
     background: transparent;
