@@ -88,7 +88,7 @@ function handlePurchase(tierId: string) {
       border-bottom: var(--border);
     ">
       <router-link to="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
-        <img :src="'/logo.png'" alt="Morgan" style="height: 36px; border-radius: 6px; display: block;" />
+        <img :src="'/logo.png'" alt="Morgan" style="height: 44px; border-radius: 6px; display: block;" />
         <span style="font-family: var(--font-display); font-weight: 600; font-size: 24px; color: var(--accent);">Morgan</span>
       </router-link>
       <div style="display: flex; align-items: center; gap: 10px;">

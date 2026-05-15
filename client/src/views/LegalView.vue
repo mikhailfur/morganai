@@ -147,7 +147,7 @@ const activeDoc = computed(() => docs.find(d => d.id === activeDocId.value) || d
       border-bottom: var(--border);
     ">
       <router-link to="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
-        <img :src="'/logo.png'" alt="Morgan" style="height: 34px; border-radius: 5px; display: block;" />
+        <img :src="'/logo.png'" alt="Morgan" style="height: 42px; border-radius: 5px; display: block;" />
         <span style="font-family: var(--font-display); font-weight: 600; font-size: 22px; color: var(--accent);">Morgan</span>
       </router-link>
       <div style="display: flex; gap: 24px; font-family: var(--font-ui); font-size: 13px; color: var(--fg); align-items: center; flex-wrap: wrap;">

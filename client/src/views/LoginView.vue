@@ -259,7 +259,7 @@ async function handleTelegramOAuth() {
                     <img
                         :src="'/logo.png'"
                         alt="Morgan"
-                        style="height: 36px; border-radius: 6px; display: block"
+                        style="height: 44px; border-radius: 6px; display: block"
                     />
                     <span
                         style="
