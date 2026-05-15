@@ -110,17 +110,17 @@ async function submitDelete() {
     <!-- Sidebar -->
     <div class="settings-sidebar">
       <div class="settings-logo">
-        <div style="display: flex; align-items: baseline; gap: 8px;">
+        <router-link to="/" style="display: flex; align-items: center; gap: 8px; text-decoration: none;">
+          <img :src="'/logo.png'" alt="Morgan" style="height: 30px; border-radius: 5px; display: block;" />
           <span style="font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--accent);">Morgan</span>
-          <span style="font-family: var(--font-display); font-size: 12px; color: var(--accent2);">夢</span>
-        </div>
-        <div style="font-family: var(--font-mono); font-size: 9px; color: var(--accent); letter-spacing: 1.6px; text-transform: uppercase; margin-top: 4px; opacity: 0.8;">AI · OP. III</div>
+        </router-link>
+        <div class="settings-logo-sub">AI · OP. III</div>
       </div>
       <div class="settings-sidebar-rule"></div>
       <div class="settings-nav-label">Меню</div>
       <router-link to="/chat" class="nav-item" style="display: block; text-decoration: none; font-size: 14px;">Чат</router-link>
       <router-link to="/pricing" class="nav-item" style="display: block; text-decoration: none; font-size: 14px;">Тарифы</router-link>
-      <div class="nav-item active" style="font-size: 14px;">Настройки</div>
+      <div class="nav-item active settings-self-item" style="font-size: 14px;">Настройки</div>
       <button @click="theme.toggle()" class="nav-item" style="width: 100%; text-align: left; font-size: 13px; border: none; background: transparent; cursor: pointer; opacity: 0.7;">
         {{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}
       </button>
@@ -340,6 +340,15 @@ async function submitDelete() {
   overflow-y: auto;
 }
 .settings-logo { padding: 0 20px 14px; }
+.settings-logo-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--accent);
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  margin-top: 4px;
+  opacity: 0.8;
+}
 .settings-sidebar-rule { height: 1px; background: var(--rule); margin: 0 20px; }
 .settings-nav-label {
   padding: 12px 20px 6px;
@@ -428,28 +437,39 @@ async function submitDelete() {
     width: 100%;
     flex-direction: row;
     align-items: center;
-    padding: 0;
+    padding: 0 12px;
     border-right: none;
     border-bottom: var(--border);
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: hidden;
     flex-shrink: 0;
-    height: auto;
+    height: 52px;
+    gap: 2px;
   }
   .settings-logo {
-    padding: 12px 16px;
+    padding: 0 12px 0 0;
     border-right: var(--border);
     flex-shrink: 0;
+    margin-right: 8px;
   }
-  .settings-logo > div:last-child { display: none; }
+  .settings-logo-sub { display: none; }
   .settings-sidebar-rule { display: none; }
   .settings-nav-label { display: none; }
+  .settings-self-item { display: none; }
   .settings-sidebar .nav-item {
-    padding: 12px 14px !important;
+    padding: 8px 10px !important;
+    font-size: 12px !important;
     border-bottom: none !important;
-    border-right: var(--border);
+    border-right: none !important;
     white-space: nowrap;
     flex-shrink: 0;
+    letter-spacing: 0 !important;
+  }
+  /* Push theme toggle to the right */
+  .settings-sidebar .nav-item:last-child {
+    margin-left: auto;
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+    letter-spacing: 1px !important;
   }
 
   .settings-main {

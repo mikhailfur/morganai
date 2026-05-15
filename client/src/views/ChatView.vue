@@ -112,6 +112,11 @@ async function switchCharacter(slug: string) {
   await chat.fetchHistory(slug)
   sidebarOpen.value = false
 }
+
+async function handleLogout() {
+  await auth.logout()
+  router.push('/')
+}
 </script>
 
 <template>
@@ -175,7 +180,7 @@ async function switchCharacter(slug: string) {
         <button @click="theme.toggle()" class="nav-item" style="width: 100%; text-align: left; font-size: 13px; opacity: 0.7;">
           {{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}
         </button>
-        <button @click="auth.logout(); router.push('/')" class="nav-item" style="width: 100%; text-align: left; font-size: 13px; color: var(--accent2);">Выйти</button>
+        <button @click="handleLogout" class="nav-item" style="width: 100%; text-align: left; font-size: 13px; color: var(--accent2);">Выйти</button>
       </div>
     </aside>
 

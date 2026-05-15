@@ -87,9 +87,9 @@ function handlePurchase(tierId: string) {
       padding: 20px 48px;
       border-bottom: var(--border);
     ">
-      <router-link to="/" style="display: flex; align-items: baseline; gap: 10px; text-decoration: none;">
+      <router-link to="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
+        <img :src="'/logo.png'" alt="Morgan" style="height: 36px; border-radius: 6px; display: block;" />
         <span style="font-family: var(--font-display); font-weight: 600; font-size: 24px; color: var(--accent);">Morgan</span>
-        <span style="font-family: var(--font-display); font-size: 14px; color: var(--accent2);">夢</span>
       </router-link>
       <div style="display: flex; align-items: center; gap: 10px;">
         <router-link v-if="auth.isAuthenticated" to="/chat" class="btn-ghost btn-sm" style="text-decoration: none;">В чат</router-link>

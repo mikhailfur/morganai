@@ -140,6 +140,10 @@ const statCards = [
     <!-- Header -->
     <header style="display: flex; justify-content: space-between; align-items: flex-end; padding: 24px 40px 0; border-bottom: var(--border);">
       <div style="padding-bottom: 20px;">
+        <router-link to="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none; margin-bottom: 14px;">
+          <img :src="'/logo.png'" alt="Morgan" style="height: 32px; border-radius: 5px; display: block;" />
+          <span style="font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--accent);">Morgan</span>
+        </router-link>
         <div class="editorial-label" style="color: var(--accent2);">
           <span style="opacity: 0.55;">✦</span>
           ADMIN · УПРАВЛЕНИЕ
