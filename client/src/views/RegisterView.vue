@@ -76,7 +76,7 @@ async function handleTelegramOAuth() {
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 52px;">
       <router-link to="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
-        <img src="/logo.png" alt="Morgan" style="height: 38px; border-radius: 6px; display: block;" />
+        <img :src="'/logo.png'" alt="Morgan" style="height: 38px; border-radius: 6px; display: block;" />
         <span style="font-family: var(--font-display); font-weight: 600; font-size: 22px; color: var(--accent);">Morgan</span>
       </router-link>
       <div style="display: flex; align-items: center; gap: 14px;">

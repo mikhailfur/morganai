@@ -29,7 +29,7 @@ onMounted(() => {
     <!-- NAV -->
     <nav class="landing-nav">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <img src="/logo.png" alt="Morgan" style="height: 40px; border-radius: 6px; display: block;" />
+        <img :src="'/logo.png'" alt="Morgan" style="height: 40px; border-radius: 6px; display: block;" />
         <span style="font-family: var(--font-display); font-weight: 600; font-size: 26px; color: var(--accent); letter-spacing: -0.5px;">Morgan</span>
       </div>
       <div class="landing-nav-links">

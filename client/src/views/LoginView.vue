@@ -142,7 +142,7 @@ async function handleTelegramOAuth() {
       <!-- Logo + theme toggle -->
       <div style="position: absolute; top: 24px; left: 64px; right: 24px; display: flex; justify-content: space-between; align-items: center;">
         <router-link to="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
-          <img src="/logo.png" alt="Morgan" style="height: 36px; border-radius: 6px; display: block;" />
+          <img :src="'/logo.png'" alt="Morgan" style="height: 36px; border-radius: 6px; display: block;" />
           <span style="font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--accent);">Morgan</span>
         </router-link>
         <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}</button>
