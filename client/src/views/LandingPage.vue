@@ -77,7 +77,7 @@ onMounted(() => {
                 <!-- Big character panel -->
                 <div class="panel-art">
                     <img
-                        src="/characters/morgan-hero.jpg"
+                        :src="'/characters/morgan-hero.png'"
                         alt="Морган"
                         style="
                             position: absolute;

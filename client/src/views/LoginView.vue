@@ -123,7 +123,7 @@ async function handleTelegramOAuth() {
             "
         >
             <img
-                src="/characters/morgan-portrait.png"
+                :src="'/characters/morgan-portrait.png'"
                 alt="Морган"
                 style="
                     position: absolute;
