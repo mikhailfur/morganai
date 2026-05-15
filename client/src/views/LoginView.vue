@@ -22,46 +22,59 @@ async function handleLogin() {
   }
 }
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+async function loadScript(src: string): Promise<void> {
+  if (document.querySelector(`script[src="${src}"]`)) return
+  await new Promise<void>((resolve, reject) => {
+    const s = document.createElement('script')
+    s.src = src; s.onload = () => resolve(); s.onerror = reject
+    document.head.appendChild(s)
+  })
+}
 
 async function handleGoogleOAuth() {
-  if (!GOOGLE_CLIENT_ID) {
-    error.value = 'Google OAuth не настроен — см. Docs/google-oauth-setup.md'
+  const googleClientId = auth.appConfig.googleClientId
+  if (!googleClientId) {
+    error.value = 'Google OAuth не настроен — укажи GOOGLE_CLIENT_ID в env'
     return
   }
   try {
-    const { google } = window as any
-    if (!google) {
-      const script = document.createElement('script')
-      script.src = 'https://accounts.google.com/gsi/client'
-      document.head.appendChild(script)
-      await new Promise(r => script.onload = r)
-    }
-    (window as any).google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
+    await loadScript('https://accounts.google.com/gsi/client')
+    ;(window as any).google.accounts.id.initialize({
+      client_id: googleClientId,
       callback: async ({ credential }: { credential: string }) => {
         try {
           await auth.loginWithGoogle(credential)
           router.push('/chat')
         } catch (e: any) { error.value = e.message }
       },
-    });
-    (window as any).google.accounts.id.prompt()
-  } catch (e: any) {
+    })
+    ;(window as any).google.accounts.id.prompt()
+  } catch {
     error.value = 'Ошибка Google авторизации'
   }
 }
 
 async function handleTelegramOAuth() {
-  error.value = 'Telegram: войдите через виджет ниже (см. Docs/telegram-oauth-setup.md)'
-}
-
-// Telegram widget callback (called by widget script)
-;(window as any).onTelegramAuth = async (user: Record<string, any>) => {
+  const telegramBotId = auth.appConfig.telegramBotId
+  if (!telegramBotId) {
+    error.value = 'Telegram OAuth не настроен — укажи TELEGRAM_BOT_TOKEN в env'
+    return
+  }
   try {
-    await auth.loginWithTelegram(user)
-    router.push('/chat')
-  } catch (e: any) { error.value = (e as any).message }
+    await loadScript('https://telegram.org/js/telegram-widget.js?22')
+    ;(window as any).Telegram.Login.auth(
+      { bot_id: telegramBotId, request_access: 'write', origin: window.location.origin },
+      async (user: Record<string, any> | null) => {
+        if (!user) { error.value = 'Авторизация Telegram отменена'; return }
+        try {
+          await auth.loginWithTelegram(user)
+          router.push('/chat')
+        } catch (e: any) { error.value = e.message }
+      }
+    )
+  } catch {
+    error.value = 'Ошибка Telegram авторизации'
+  }
 }
 </script>
 
@@ -128,9 +141,9 @@ async function handleTelegramOAuth() {
     ">
       <!-- Logo + theme toggle -->
       <div style="position: absolute; top: 24px; left: 64px; right: 24px; display: flex; justify-content: space-between; align-items: center;">
-        <router-link to="/" style="display: flex; align-items: baseline; gap: 8px; text-decoration: none;">
+        <router-link to="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
+          <img src="/logo.png" alt="Morgan" style="height: 36px; border-radius: 6px; display: block;" />
           <span style="font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--accent);">Morgan</span>
-          <span style="font-family: var(--font-display); font-size: 12px; color: var(--accent2);">夢</span>
         </router-link>
         <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}</button>
       </div>

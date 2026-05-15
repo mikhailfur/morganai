@@ -7,12 +7,23 @@ const API = '/api';
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null);
   const loading = ref(false);
+  const appConfig = ref<{ googleClientId: string | null; telegramBotId: string | null }>({
+    googleClientId: null,
+    telegramBotId: null,
+  });
 
   const isAuthenticated = computed(() => !!user.value);
   const isAdmin = computed(() => user.value?.is_admin ?? false);
   const isPremium = computed(() => user.value?.is_premium ?? false);
   const isKycVerified = computed(() => user.value?.kyc_verified ?? false);
   const canNsfw = computed(() => isPremium.value || isKycVerified.value);
+
+  async function fetchAppConfig() {
+    try {
+      const res = await fetch(`${API}/auth/config`);
+      if (res.ok) appConfig.value = await res.json();
+    } catch {}
+  }
 
   async function fetchUser() {
     try {
@@ -137,9 +148,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    user, loading,
+    user, loading, appConfig,
     isAuthenticated, isAdmin, isPremium, isKycVerified, canNsfw,
-    fetchUser, register, login, loginWithGoogle, loginWithTelegram, logout,
+    fetchAppConfig, fetchUser, register, login, loginWithGoogle, loginWithTelegram, logout,
     updateSettings, verifyKyc, changePassword, deleteAccount,
   };
 });

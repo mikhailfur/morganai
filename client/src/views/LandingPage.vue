@@ -28,9 +28,9 @@ onMounted(() => {
 
     <!-- NAV -->
     <nav class="landing-nav">
-      <div style="display: flex; align-items: baseline; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <img src="/logo.png" alt="Morgan" style="height: 40px; border-radius: 6px; display: block;" />
         <span style="font-family: var(--font-display); font-weight: 600; font-size: 26px; color: var(--accent); letter-spacing: -0.5px;">Morgan</span>
-        <span style="font-family: var(--font-display); font-size: 16px; color: var(--accent2);">夢</span>
       </div>
       <div class="landing-nav-links">
         <router-link to="/pricing" class="nav-text-link">Тарифы</router-link>

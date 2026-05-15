@@ -136,9 +136,9 @@ async function switchCharacter(slug: string) {
     }">
       <!-- Logo -->
       <div style="padding: 20px 20px 14px; border-bottom: var(--border);">
-        <div style="display: flex; align-items: baseline; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <img src="/logo.png" alt="Morgan" style="height: 32px; border-radius: 5px; display: block;" />
           <span style="font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--accent);">Morgan</span>
-          <span style="font-family: var(--font-display); font-size: 12px; color: var(--accent2);">夢</span>
         </div>
         <div style="font-family: var(--font-mono); font-size: 9px; color: var(--accent2); letter-spacing: 1.6px; text-transform: uppercase; margin-top: 3px;">AI · OP. III</div>
       </div>

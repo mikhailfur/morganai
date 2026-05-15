@@ -112,6 +112,15 @@ router.get('/me', authMiddleware, async (req: any, res: Response) => {
   }
 });
 
+// Public app config (Google Client ID, Telegram Bot ID) — for runtime env injection
+router.get('/config', (_req: Request, res: Response) => {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
+  res.json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID || null,
+    telegramBotId: botToken ? botToken.split(':')[0] : null,
+  });
+});
+
 // Google OAuth
 router.post('/google', async (req: Request, res: Response) => {
   try {
