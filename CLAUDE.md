@@ -7,82 +7,70 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Правила работы Claude
 
 1. **Язык:** Все ответы — строго на **русском языке**. Технические термины и идентификаторы кода остаются на языке оригинала.
-2. **Playwright скриншоты:** Все скриншоты и файлы Playwright сохранять строго в папку **`PlayWrightPNG/`** в корне проекта. Очищать папку перед новым запуском тестов, если не указано иное
+2. **Playwright скриншоты:** Все скриншоты и файлы Playwright сохранять строго в папку **`PlayWrightPNG/`** в корне проекта. Очищать папку перед новым запуском тестов, если не указано иное.
 3. **Документация:** Все гайды, описания задач, технические документы и changelog хранить строго в папке **`Docs/`** в корне проекта.
 
 ---
 
 ## Правила Git и CI/CD
 
-### Разрешено и рекомендуется (без дополнительного подтверждения)
+### Разрешено без дополнительного подтверждения
 
-- **Коммиты и пуш в `dev`** — после завершения задачи Claude самостоятельно делает коммит и пушит изменения в ветку `dev`. Ждать отдельной команды не нужно.
-- **Минимизация токенов на git-операции** — для коммитов, пушей и проверки CI использовать модель `claude-haiku-4-5` через флаг `--model haiku` или делегировать эти операции через `Agent(subagent_type="claude", model="haiku")`. Код пишется основной моделью, а рутинные операции (git add, commit, push, gh run list) — более дешёвой.
-- **Проверка CI/CD после каждого пуша** — после пуша в `dev` обязательно проверить статус GitHub Actions: `gh run list --branch dev --limit 3`. Если сборка упала — изучить логи (`gh run view <id> --log-failed`) и исправить ошибку. Не сообщать пользователю об успехе до подтверждения зелёного CI.
-- **Никогда не удалять CLAUDE.md или менять его содержимое** без явного подтверждения.
+- **Коммиты и пуш в `dev`** — после завершения задачи Claude самостоятельно делает коммит и пушит изменения в ветку `dev`.
+- **Минимизация токенов на git-операции** — для коммитов, пушей и проверки CI использовать модель `claude-haiku-4-5` или делегировать через `Agent(subagent_type="claude", model="haiku")`.
+- **Проверка CI/CD после каждого пуша** — `gh run list --branch dev --limit 3`. Если упало — изучить логи (`gh run view <id> --log-failed`) и исправить.
 
-### Запрещено категорически (без явной команды пользователя)
+### Запрещено категорически
 
-- **Любые действия с веткой `main`** — ни коммиты, ни пуши, ни мержи, ни rebase. Ветка `main` — только по прямой команде пользователя с явным подтверждением.
-- **Циклический фикс** — если одна и та же ошибка повторяется более 2 раз подряд, остановиться и сообщить пользователю. Не пытаться "угадать" решение, тратя токены впустую.
-- **Бесполезные действия ради действий** — не запускать linter/typecheck/build если задача их не затрагивает. Не читать файлы которые заведомо не нужны. Не делать повторные Read файлов которые уже были прочитаны в этой сессии.
-
----
-
-## Экономия токенов и лимитов
-
-**Главный принцип: качество кода не снижается, но каждое действие должно быть оправдано.**
-
-- **Перед любым действием — думать:** нужно ли оно? Если файл уже был прочитан — не читать снова. Если тип ошибки ясен без запуска — не запускать.
-- **Не проверять то, что заведомо работает** — если изменён только один CSS-класс, не нужно запускать полный typecheck TypeScript.
-- **Grep вместо чтения** — для поиска конкретной строки/функции использовать `grep`/`find`, а не читать весь файл. Также: Всегда использовать флаг -n для получения номеров строк
-- **Задавать вопросы до начала работы** — если задача неоднозначна, сначала уточнить у пользователя, а не делать и переделывать. Лучше 2 вопроса до, чем 3 итерации после.
-- **Предлагать план при сложных задачах** — для задач затрагивающих 3+ файла или требующих архитектурных решений — сначала изложить план в 3–5 пунктах и дождаться одобрения.
-- **Не дублировать контекст** — не пересказывать пользователю то, что он только что написал. Сразу к делу.
+- **Любые действия с веткой `main`** — только по прямой команде пользователя с явным подтверждением.
+- **Циклический фикс** — если та же ошибка повторяется более 2 раз подряд, остановиться и сообщить.
+- **Бесполезные действия** — не запускать linter/typecheck/build без необходимости. Не перечитывать файлы, уже прочитанные в сессии.
 
 ---
 
-## Справки и гайды (не правила, но практика)
+## Экономия токенов
 
-- **Гайды для пользователя** — если для реализации фичи нужны действия пользователя (создать API ключ, зарегистрироваться в сервисе, настроить DNS и т.д.) — написать пошаговый гайд и сохранить его в `Docs/`. Не блокировать разработку ожиданием — реализовать заглушку/placeholder и указать где подставить ключ.
-- **Вопросы вместо предположений** — если неясно как должна выглядеть фича или какой подход предпочесть — задать конкретный вопрос. Предложить 2–3 варианта с коротким описанием trade-off'ов. Не угадывать.
+- **Grep перед Read:** для поиска строк/функций использовать `grep -n`, а не читать весь файл.
+- **Задавать вопросы до начала работы** — если задача неоднозначна, уточнить перед стартом.
+- **Предлагать план при сложных задачах** (3+ файла, архитектурные решения) — план в 3–5 пунктах, ждать одобрения.
 
 ---
 
-## Что такое Morgan AI
+## О проекте
 
-**Morgan AI** — веб-платформа для ролевых игр с AI-персонажами. Пользователи общаются с уникальными AI-компаньонами через чат с поддержкой текста, голосовых сообщений и изображений. Мигрировано из Telegram-бота ([alyabot](https://github.com/mikhailfur/alyabot)) в веб-приложение.
+**Morgan AI** — веб-платформа 18+ для ролевых игр с AI-персонажами. Чат с текстом, голосом и изображениями. Мигрировано из Telegram-бота в веб-приложение.
 
 ---
 
 ## Development Commands
 
 ```bash
-# Запуск обоих сервисов из корня
+# Оба сервиса из корня
 npm run dev
 
-# По отдельности:
-cd server && npm run dev     # Express на порту 3001 (tsx watch mode)
-cd client && npm run dev     # Vite на порту 5173 (проксирует /api → :3001)
+# По отдельности
+cd server && npm run dev     # Express :3001, tsx watch mode
+cd client && npm run dev     # Vite :5173, проксирует /api → :3001
 
-# Type check
+# Type check (обязательно перед коммитом)
+cd client && npx vue-tsc --noEmit
 cd server && npx tsc --noEmit
-cd client && npx vue-tsc --noEmit    # ← обязательно перед коммитом
 
 # Build
 npm run build                # собирает оба
-cd server && npm run build   # → server/dist/
 cd client && npm run build   # → client/dist/
+cd server && npm run build   # → server/dist/
 ```
 
 ---
 
 ## Tech Stack
 
-- **Backend:** Node.js + Express + TypeScript, MySQL (mysql2/promise), JWT (bcryptjs + jsonwebtoken), multer
+- **Backend:** Node.js + Express + TypeScript, MySQL (mysql2/promise), JWT + httpOnly cookies (bcryptjs + jsonwebtoken + cookie-parser), multer
 - **Frontend:** Vue 3 (`<script setup lang="ts">`) + TailwindCSS v4 + Pinia + Vue Router 4
-- **AI:** OpenRouter API (default model: `deepseek/deepseek-chat-v4-0324`), SSE streaming
+- **AI:** OpenRouter API (default: `deepseek/deepseek-chat-v4-0324`), SSE streaming, prompt caching (cache_control: ephemeral)
 - **TTS:** MiniMax API (`speech-2.6-turbo`)
+- **OAuth:** Google Identity Services (GSI), Telegram Login Widget
 
 ---
 
@@ -91,14 +79,49 @@ cd client && npm run build   # → client/dist/
 ### Main Request Flow (Chat Streaming)
 
 ```
-POST /api/chat/stream { message, characterSlug }
-  → Load user + character + last 20 messages from DB
+POST /api/chat/stream { message, characterSlug, clientTimezone? }
+  → authMiddleware: JWT из httpOnly cookie morgan_token
+  → Проверить is_banned → 403
+  → Проверить subscription_expires_at → auto-downgrade если истёк
+  → checkMessageLimit(user, planType) → 429 если превышен лимит
+  → Инкремент daily_messages_count
+  → Load character + last N сообщений из DB (N берётся из plan_limits)
   → system_prompt = character.system_prompt + getBehaviorPrompt(mode, voiceCount)
-  → MemoryManager.buildMessages() → trims to 12000 chars
+  → injectPromptVariables(prompt, { userName, userLocalTime, currentDate })
+  → MemoryManager.buildMessages() → trim по context_chars из plan_limits
+  → system prompt с cache_control: ephemeral → кэш на стороне OpenRouter ~5 мин
   → OpenRouterClient.generateStreamResponse() → SSE: data: { text: "chunk" }
-  → Parse [VOICE: text] tag → MiniMaxTTS.generateSpeech() → data: { voice: base64 }
+  → Parse [VOICE: text] → MiniMaxTTS.generateSpeech() → data: { voice: base64 }
   → data: [DONE]
   → Save full response to chat_history
+```
+
+### Auth Flow (httpOnly Cookie)
+
+```
+POST /api/auth/login | /register | /google | /telegram
+  → Verify credentials (bcrypt / Google idToken / Telegram HMAC)
+  → res.cookie('morgan_token', jwt, { httpOnly: true, sameSite: 'lax' })
+  → Все fetch на клиенте: credentials: 'include'
+  → authMiddleware читает req.cookies.morgan_token (fallback: Authorization header)
+```
+
+### Google OAuth
+
+```
+Client: google.accounts.id.renderButton() → невидимый iframe поверх styled button
+  → popup окно Google → credential (idToken) → POST /api/auth/google { idToken }
+Server: OAuth2Client.verifyIdToken() → декодировать payload
+  → найти/создать user по google_id или email → httpOnly cookie → return user
+```
+
+### Telegram OAuth
+
+```
+Client: Telegram.Login.auth({ bot_id, request_access, origin }, callback)
+  → callback получает user object → POST /api/auth/telegram { ...user }
+Server: Проверить HMAC-SHA256(SHA256(botToken), dataCheckString)
+  → найти/создать user по telegram_id → httpOnly cookie → return user
 ```
 
 ### Production Container
@@ -108,18 +131,7 @@ Root `Dockerfile` — multi-stage single container:
 2. `server-builder` — tsc build → `/server/dist`
 3. Final image — Express serves API + static Vue из `/app/public/`
 
-В production `CLIENT_URL=*` активирует `origin: true` в CORS (wildcard-строка работает, а `*` с `credentials: true` — нет).
-
-### CI/CD (GitHub Actions → Dokploy)
-
-Файл: `.github/workflows/deploy.yml` — триггер: push в ветку `dev`:
-1. Build + push Docker image в `ghcr.io/mikhailfur/morganai` (`:latest` + `:sha`)
-2. POST на `${{ secrets.DOKPLOY_WEBHOOK_URL }}` — редеплой в Dokploy
-
-Пакет `ghcr.io/mikhailfur/morganai` должен быть **публичным** (иначе Dokploy не сможет pull без auth).
-Секрет `DOKPLOY_WEBHOOK_URL` берётся из Dokploy panel → приложение → Deploy Webhook.
-
-`docker-compose.yml` в корне — для локальной разработки с отдельными сервисами (db + server + client).
+CI/CD: `.github/workflows/deploy.yml` — триггер push в `dev` → Docker build → push `ghcr.io/mikhailfur/morganai` → POST на `DOKPLOY_WEBHOOK_URL`.
 
 ---
 
@@ -127,177 +139,203 @@ Root `Dockerfile` — multi-stage single container:
 
 | Файл | Назначение |
 |------|-----------|
-| `server/src/config.ts` | Читает `.env` из корня репо; путь `../../.env` относительно `dist/` |
-| `server/src/database.ts` | MySQL pool + все CREATE TABLE + seed персонажа "Morgan" |
-| `server/src/auth.ts` | bcrypt hash/compare, JWT sign/verify, `authMiddleware`, `adminMiddleware` |
-| `server/src/openrouter.ts` | OpenRouter client: generate, stream, analyzeImage (vision) |
-| `server/src/memory.ts` | Форматирует историю: max 20 сообщений, max 12000 chars |
-| `server/src/prompt.ts` | `getBehaviorPrompt()` — режим поведения + NSFW фильтр + лимит голосовых |
+| `server/src/config.ts` | Читает `.env` из корня; путь `../../.env` относительно `dist/` |
+| `server/src/database.ts` | MySQL pool + CREATE TABLE + seed + все DB-методы |
+| `server/src/auth.ts` | bcrypt, JWT, `authMiddleware`, `adminMiddleware`, cookie constants |
+| `server/src/openrouter.ts` | OpenRouter client: generate, stream, analyzeImage, **prompt caching** |
+| `server/src/memory.ts` | Форматирует историю: max N сообщений, max M chars (из plan_limits) |
+| `server/src/prompt.ts` | `getBehaviorPrompt()` + `injectPromptVariables()` ({{user_name}}, {{user_time}}, {{current_date}}) |
 | `server/src/voice.ts` | MiniMax TTS: hex response → Buffer → mp3 |
+| `server/src/characters/` | Персонажи как TS-модули: `types.ts`, `morgan.ts`, `index.ts` |
+| `server/src/routes/auth.routes.ts` | register, login, logout, me, config, google, telegram |
+| `server/src/routes/user.routes.ts` | settings, change-password, delete-account, kyc-verify, characters |
+| `server/src/routes/chat.routes.ts` | send, stream (с лимитами и кэшем), history, clear |
+| `server/src/routes/admin.routes.ts` | stats, users, ban, subscription, plan-limits, events |
+| `client/src/stores/auth.ts` | Pinia: login/logout/register/google/telegram, `appConfig` (runtime env) |
+| `client/src/stores/theme.ts` | Тема Yume/Nocturne, **slide overlay** при переключении |
 | `client/src/style.css` | Дизайн-система: CSS variables, компоненты, анимации |
-| `client/src/types/index.ts` | TypeScript типы: `User`, `ChatMessage`, `Character`, `AuthResponse` |
+| `client/src/components/CookieBanner.vue` | GDPR cookie consent баннер |
+| `client/src/views/SettingsView.vue` | Настройки: смена пароля, удаление аккаунта, KYC/18+, NSFW |
+| `client/src/views/AdminView.vue` | Таб-панель: обзор, пользователи, подписки, лимиты, лог событий |
+| `client/public/logo.svg` | Логотип — SVG, прозрачный фон, работает в обеих темах |
+| `client/public/characters/` | Арт персонажей: `morgan-portrait.png`, `morgan-hero.png` |
+| `Docs/` | Гайды: OAuth setup, art placeholders, character prompts, CHANGELOG |
 
 ---
 
 ## Environment Variables
 
 ```env
-OPENROUTER_API_KEY=          # Обязательно
-OPENROUTER_MODEL=            # Default: deepseek/deepseek-chat-v4-0324
+# Обязательные
+OPENROUTER_API_KEY=
+JWT_SECRET=
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_USER=root
 MYSQL_PASSWORD=
-MYSQL_DATABASE=morganai      # Создать вручную: CREATE DATABASE morganai
-JWT_SECRET=                  # Обязательно
-JWT_EXPIRES_IN=7d
-MINIMAX_API_TOKEN=           # Опционально — TTS голос
-MINIMAX_VOICE_ID=            # Опционально — MiniMax voice ID
-ADMIN_EMAILS=email@mail.com  # Через запятую
+MYSQL_DATABASE=morganai
+
+# Опциональные — AI / TTS
+OPENROUTER_MODEL=deepseek/deepseek-chat-v4-0324
+MINIMAX_API_TOKEN=
+MINIMAX_VOICE_ID=
+
+# OAuth (runtime, не нужны при build)
+GOOGLE_CLIENT_ID=          # google-auth-library verifyIdToken
+TELEGRAM_BOT_TOKEN=        # HMAC verification + bot_id для виджета
+
+# Прочее
+ADMIN_EMAILS=email@mail.com   # через запятую
 PORT=3001
 CLIENT_URL=http://localhost:5173
+JWT_EXPIRES_IN=7d
+NODE_ENV=production
 ```
 
-В Docker `.env` отсутствует — env vars передаются через Docker environment config.
+В Docker передаются как env vars, `.env` файл отсутствует в контейнере.
 
 ---
 
 ## Database Schema
 
-**5 таблиц:** `users`, `characters`, `chat_history`, `subscriptions`, `voice_messages`
+**Таблицы:** `users`, `characters`, `chat_history`, `subscriptions`, `voice_messages`, `plan_limits`, `admin_events`
 
-Все timestamps — **BIGINT миллисекунды** (`Date.now()`).
+Все timestamps — BIGINT миллисекунды (`Date.now()`).
 
-Ключевые поля:
-- `users.behavior_mode`: `'default' | 'study' | 'work' | 'psychologist' | 'nsfw'`
-- `users.selected_character`: slug (default `'morgan'`)
-- `characters.slug`: URL-safe уникальный ID
-- `chat_history`: composite index на `(user_id, character_slug, timestamp)`
-- `voice_messages`: rate-limiting — max 20 за 5 часов на пользователя
+**`users` — ключевые поля:**
+- `behavior_mode`: `'default' | 'study' | 'work' | 'psychologist' | 'nsfw'`
+- `selected_character`: slug (default `'morgan'`)
+- `subscription_type`: `'free' | 'premium' | 'premium_plus'`
+- `subscription_expires_at`: BIGINT — если < Date.now(), авто-downgrade на free
+- `kyc_verified`: BOOLEAN — разблокирует NSFW без Premium
+- `is_banned`: BOOLEAN — проверяется в authMiddleware → 403
+- `daily_messages_count` / `daily_messages_reset`: счётчик лимита, сбрасывается в начале UTC-дня
+- `google_id` / `telegram_id`: для OAuth
+
+**`plan_limits`** — конфигурируемые лимиты по тарифу:
+- `daily_message_limit`, `context_messages`, `context_chars`, `voice_limit`, `voice_window_hours`
+- Редактируются через Admin → Лимиты. Кэшируются на стороне сервера.
+
+**`admin_events`** — лог действий администратора (ban, subscription change).
+
+Добавить персонажа: `INSERT INTO characters (slug, name, description, system_prompt, greeting_message, is_premium, is_active, sort_order, created_at) VALUES (...)`
+
+---
+
+## Vite/Static Assets — Важная особенность
+
+**Никогда не использовать статический `src="..."` для путей к файлам из `public/`.**
+Vite/rolldown при сборке пытается разрешить их как ES-модули → `UNRESOLVED_IMPORT` → CI ломается.
+
+```html
+<!-- ❌ Сломает CI -->
+<img src="/logo.svg">
+<img src="/characters/morgan-hero.png">
+
+<!-- ✅ Правильно — динамический биндинг, Vite не трогает -->
+<img :src="'/logo.svg'">
+<img :src="'/characters/morgan-hero.png'">
+```
 
 ---
 
 ## Design System — Yume & Nocturne
 
-Дизайн: **manga/editorial dual-theme** — вдохновлён японскими манга и арт-журналами.
+Переключение: `html.dark` класс. Состояние в `useThemeStore` (localStorage). При переключении — **slide overlay** анимация (`.theme-overlay` в style.css).
 
-### Темы
-
-| | Yume (светлая, default) | Nocturne (тёмная) |
-|--|------------------------|-------------------|
+| | Yume (светлая) | Nocturne (тёмная) |
+|--|--|--|
 | `--bg` | `#f5ecdc` (кремовый) | `#0e0807` (кофейный чёрный) |
-| `--bg-alt` | `#ede2cd` | `#16100d` |
 | `--fg` | `#2a1014` (тёмно-бордовый) | `#eee2c8` (кремовый) |
 | `--accent` | `#5c1a1f` (бордо) | `#c63d2f` (алый) |
 | `--accent2` | `#c8543b` (терракота) | `#c63d2f` |
 | `--accent3` | `#e89478` (персиковый) | `#a8753a` (янтарный) |
-| `--border` | `2.5px solid #2a1014` | `1px solid rgba(...)` |
-| `--shadow-box` | `5px 5px 0 #2a1014` | `none` |
 
-Переключение темы: добавление/удаление класса `html.dark`. Состояние хранится в `useThemeStore` (Pinia), сохраняется в `localStorage`.
+**Шрифты:**
+- `--font-display`: `Fraunces, Noto Serif JP, serif` — заголовки, имена персонажей
+- `--font-ui`: `Inter, sans-serif` — интерфейс, тело текста
+- `--font-mono`: системный monospace — лейблы, метки
 
-### Шрифты
-
-- `--font-display`: `'Fraunces', 'Noto Serif JP', serif` — заголовки, декоративные элементы, имена персонажей
-- `--font-ui`: `'Inter', sans-serif` — интерфейс, тело текста
-- `--font-mono`: системный monospace — лейблы, метки, технический текст
-
-### Ключевые CSS-компоненты (`client/src/style.css`)
-
-| Класс | Назначение |
-|-------|-----------|
-| `.editorial-label` | Метка секции: `ОЧ · РАЗДЕЛ` с иероглифом-декором |
-| `.display-heading` | Большой serif-заголовок с letter-spacing |
-| `.btn-primary` | Кнопка: `--bg` + тёмная обводка, `white-space: nowrap` |
-| `.btn-ghost` | Кнопка-контур, `white-space: nowrap` |
-| `.btn-sm` | Модификатор уменьшенного размера |
-| `.nav-item` | Элемент навигации с hover/active состоянием |
-| `.chat-bubble-user` | Пузырь сообщения пользователя (правый, `--bg-alt`) |
-| `.chat-bubble-ai` | Пузырь AI (левый, `--bg`) |
-| `.m-textarea` | Textarea для ввода сообщений |
-| `.art-slot` | Слот под арт персонажа (диагональная штриховка) |
-| `.washi-tape` | Декоративная "лента васи" (только в светлой теме) |
-| `.theme-toggle` | Кнопка переключения темы (monospace, `СВЕТ`/`НОЧЬ`) |
-| `.mode-card` | Карточка выбора режима с active состоянием |
-| `.typing-dot` | Анимированная точка индикатора набора |
-| `.animate-fade-in` | Плавное появление |
-
-### Форматирование сообщений AI (ChatView.vue)
-
-Сырой текст от AI проходит через `formatContent()`:
-1. Удаляет `[VOICE: ...]` теги
-2. `(мысль)` → `<span class="msg-thought">` (прозрачный, курсив)
-3. `*действие*` → `<em class="msg-action">` (цвет `--accent3`, блочный)
-4. Переносы `\n` → `<br>`
-
-**Важно:** мысли (`(...)`) заменяются **до** курсива (`*...*`), иначе CSS-переменные типа `(--accent3)` будут ошибочно обёрнуты в `msg-thought`.
-
-### Mobile Layout
-
-- Root containers используют `height: 100dvh` (dynamic viewport height) для корректной работы с адресной строкой браузера на мобильных.
-- Chat sidebar на мобильном: `position: fixed`, появляется по hamburger-кнопке с backdrop overlay.
-- Settings sidebar на мобильном: горизонтальный скролируемый topbar.
-- Кнопки с `white-space: nowrap` предотвращают перенос текста на мобильном.
-
----
-
-## Conventions
-
-- **Язык:** Весь user-facing текст и AI промпты — **на русском**
-- **Timestamps:** Всегда миллисекунды (`Date.now()`)
-- **API errors:** `{ error: "message" }` + HTTP status code
-- **Route typing:** Routes используют `req: any` для обхода TypeScript strictness на `req.user`
-- **Singletons:** Модули экспортируют экземпляры: `database`, `openrouterClient`, `memoryManager`, `minimaxTTS`
-- **Pinia stores:** Composition API / setup function style
-- **Chat streaming:** SSE через `POST /api/chat/stream`, не WebSocket
-- **CSS:** TailwindCSS v4 + кастомные классы в `style.css` через `@layer components`
-- **Vue компоненты:** `<script setup lang="ts">`, без Options API
-- **SVG-иконки:** использовать inline SVG вместо emoji для кнопок интерфейса
+**Ключевые CSS-классы** (`client/src/style.css`): `.editorial-label`, `.display-heading`, `.btn-primary`, `.btn-ghost`, `.btn-sm`, `.nav-item`, `.chat-bubble-user`, `.chat-bubble-ai`, `.m-textarea`, `.art-slot`, `.washi-tape`, `.theme-toggle`, `.mode-card`, `.typing-dot`, `.animate-fade-in`
 
 ---
 
 ## Character Response Format
 
 ```
-*действие/эмоция курсивом*   — описание действий
-Речь обычным текстом          — что говорит персонаж
-(мысли в скобках)             — внутренние мысли
-[VOICE: текст]                — генерируется MiniMax TTS
+*действие/эмоция*    — описание, <em class="msg-action">
+Речь обычным текстом — что говорит персонаж
+(мысли в скобках)   — внутренние мысли, <span class="msg-thought">
+[VOICE: текст]      — генерируется MiniMax TTS, тег удаляется из UI
 ```
 
----
-
-## Extending the System
-
-**Добавить персонажа:** `INSERT INTO characters (slug, name, description, system_prompt, greeting_message, is_premium, is_active, sort_order, created_at) VALUES (...)`
-
-**Добавить режим поведения** — 4 места:
-1. `server/src/prompt.ts` → добавить case в `getBehaviorPrompt()`
-2. `client/src/views/ChatView.vue` → массив `modes` в модале настроек
-3. `client/src/views/SettingsView.vue` → массив `modes`
-4. `server/src/routes/user.routes.ts` → массив `validModes`
+`formatContent()` в ChatView.vue: удаляет [VOICE:], оборачивает мысли, действия, конвертирует \n → `<br>`. **Порядок важен:** мысли заменяются до курсива.
 
 ---
 
-## Tарифы (PricingView.vue)
+## Conventions
 
-| Тариф | Цена | Особенности |
-|-------|------|------------|
-| Free | 0₽ | 50 сообщений/день, 20 голосовых/5ч |
-| Premium | 299₽/мес или 2390₽/год | 500 сообщений/день, все персонажи |
-| Premium+ | 599₽/мес или 4790₽/год | Безлимит голоса, расширенный контекст (100к токенов), приоритетная генерация |
-
-Premium назначается администратором вручную через AdminView (нет интеграции оплаты).
+- **Timestamps:** всегда миллисекунды (`Date.now()`)
+- **API errors:** `{ error: "message" }` + HTTP status
+- **Route typing:** `req: any` для обхода TS strictness на `req.user`
+- **Singletons:** `database`, `openrouterClient`, `memoryManager`, `minimaxTTS`
+- **Pinia stores:** composition API / setup function style
+- **SSE streaming:** `POST /api/chat/stream`, не WebSocket
+- **CSS:** TailwindCSS v4 + кастомные классы в `style.css` через `@layer components`
+- **Vue компоненты:** `<script setup lang="ts">`, без Options API
+- **SVG-иконки:** inline SVG вместо emoji
 
 ---
 
-## Known Limitations
+## Тарифы
 
-- STT (speech-to-text) — placeholder в `voice.routes.ts`, не реализован
-- Интеграция оплаты — Premium переключается вручную через AdminView
-- Загруженные изображения передаются в AI, но не отображаются как превью в чате
-- `avatar_url` в `characters` есть, но нет изображений
-- Нет сброса пароля / верификации email
-- Нет `express-rate-limit` на API-роутах
-- История чата — последние 50 сообщений без пагинации
-- Кнопка записи голоса в UI есть, но `MediaRecorder` не подключён
+| Тариф | Цена | Лимиты |
+|-------|------|--------|
+| Free | 0₽ | 50 сообщений/день, 20 контекстных, 12к символов |
+| Premium | 299₽/мес | 500 сообщений/день, все персонажи, голос, NSFW |
+| Premium+ | 599₽/мес | Безлимит голоса, 100к токенов контекста, приоритет |
+
+Лимиты редактируются через Admin → Лимиты (`plan_limits` таблица). Premium назначается администратором вручную через AdminView.
+
+---
+
+## Что реализовано (основные фазы)
+
+- **httpOnly Cookie Auth** — `morgan_token` cookie, `credentials: 'include'` везде
+- **OpenRouter Prompt Caching** — `cache_control: ephemeral` на system prompt
+- **Theme Slide Overlay** — анимация при переключении темы
+- **Cookie Consent Banner** — `CookieBanner.vue`, consent в localStorage
+- **Password Change / Account Deletion** — `POST /api/user/change-password`, `DELETE /api/user/account`
+- **KYC/NSFW** — `POST /api/user/kyc-verify`, разблокировка NSFW без Premium
+- **Message Limits** — проверка в chat.routes.ts, конфиг в `plan_limits`, авто-сброс по UTC-дню
+- **Персонажи как TS-модули** — `server/src/characters/`: types, morgan, index
+- **Prompt Variables** — `injectPromptVariables()` с `{{user_name}}`, `{{user_time}}`, `{{current_date}}`
+- **Google OAuth** — renderButton overlay (popup), `google-auth-library` верификация
+- **Telegram OAuth** — Login Widget, HMAC-SHA256 верификация
+- **Admin Panel** — tabs: обзор, пользователи, подписки, лимиты, лог событий, ban
+- **Logo SVG** — `logo.svg` прозрачный фон, работает в обеих темах; все изображения персонажей в `client/public/characters/`
+
+---
+
+## Что предстоит сделать
+
+| Задача | Приоритет | Примечание |
+|--------|-----------|------------|
+| Интеграция оплаты | Высокий | Stripe / ЮKassa / СБП; сейчас только ручная выдача через Admin |
+| Email-верификация | Средний | Нет верификации email при регистрации |
+| Сброс пароля | Средний | Нет flow "забыл пароль" |
+| STT (голосовой ввод) | Средний | Placeholder в `voice.routes.ts`, `MediaRecorder` не подключён |
+| `express-rate-limit` | Средний | Нет rate-limiting на API-роутах (DoS-уязвимость) |
+| Пагинация истории чата | Низкий | Сейчас только последние 50 сообщений, без постраничной загрузки |
+| Превью загруженных изображений | Низкий | Изображения в AI передаются, но в UI не отображаются как превью |
+| Автоматическое продление подписки | Низкий | Сейчас подписка не продлевается автоматически |
+
+---
+
+## Как добавить новый режим поведения
+
+Изменить 4 места:
+1. `server/src/prompt.ts` — добавить case в `getBehaviorPrompt()`
+2. `client/src/views/ChatView.vue` — массив `modes` в модале настроек
+3. `client/src/views/SettingsView.vue` — массив `modes`
+4. `server/src/routes/user.routes.ts` — массив `validModes`
