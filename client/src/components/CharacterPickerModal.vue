@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useChatStore } from '../stores/chat'
-import { useAuthStore } from '../stores/auth'
 import type { UserCharacter } from '../types'
 import CharacterEditorModal from './CharacterEditorModal.vue'
 
@@ -16,7 +15,6 @@ const emit = defineEmits<{
 }>()
 
 const chat = useChatStore()
-const auth = useAuthStore()
 
 const activeTab = ref<'canonical' | 'mine' | 'community'>('canonical')
 const showEditor = ref(false)
@@ -47,8 +45,7 @@ function openEdit(char: UserCharacter) {
   showEditor.value = true
 }
 
-function onEditorSaved(char: UserCharacter) {
-  // список обновляется через store
+function onEditorSaved(_char: UserCharacter) {
   showEditor.value = false
 }
 
@@ -60,9 +57,6 @@ function onEditorDeleted(id: number) {
   showEditor.value = false
 }
 
-async function togglePublish(id: number) {
-  try { await chat.togglePublishCharacter(id) } catch { /* */ }
-}
 </script>
 
 <template>
