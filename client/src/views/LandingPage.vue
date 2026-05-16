@@ -85,7 +85,7 @@ onMounted(() => {
                             width: 100%;
                             height: 100%;
                             object-fit: cover;
-                            object-position: center top;
+                            object-position: 50% 15%;
                         "
                     />
                     <!-- Dialogue box overlay -->
@@ -613,7 +613,7 @@ export default {
     .panel-art {
         grid-column: 1 / span 2;
         grid-row: auto;
-        height: 260px;
+        height: 320px;
     }
 
     /* Hero panel: full width, auto height */
@@ -665,7 +665,7 @@ export default {
         font-size: 30px;
     }
     .panel-art {
-        height: 220px;
+        height: 280px;
     }
 }
 

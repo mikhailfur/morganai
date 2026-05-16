@@ -103,6 +103,7 @@ async function handleTelegramOAuth() {
 
 <template>
     <div
+        class="login-root"
         style="
             width: 100%;
             min-height: 100vh;
@@ -111,7 +112,7 @@ async function handleTelegramOAuth() {
             color: var(--fg);
         "
     >
-        <!-- Left: art panel (desktop only) -->
+        <!-- Left: art panel -->
         <div
             class="art-panel"
             style="
@@ -131,7 +132,7 @@ async function handleTelegramOAuth() {
                     width: 100%;
                     height: 100%;
                     object-fit: cover;
-                    object-position: center top;
+                    object-position: 50% 20%;
                 "
             />
 
@@ -151,6 +152,7 @@ async function handleTelegramOAuth() {
 
             <!-- Dialogue caption -->
             <div
+                class="art-caption"
                 style="
                     position: absolute;
                     bottom: 42px;
@@ -563,10 +565,25 @@ async function handleTelegramOAuth() {
 
 <style scoped>
 .art-panel {
-    display: flex;
+    display: block;
 }
 @media (max-width: 768px) {
+    .login-root {
+        flex-direction: column !important;
+    }
     .art-panel {
+        flex: none !important;
+        min-height: 0 !important;
+        height: 260px !important;
+        width: 100% !important;
+        border-right: none !important;
+        border-bottom: var(--border) !important;
+    }
+    .art-panel img {
+        object-position: 50% 15% !important;
+    }
+    /* Dialogue caption: hide on mobile (too cramped) */
+    .art-caption {
         display: none !important;
     }
     div[style*="flex: 0.85"] {
