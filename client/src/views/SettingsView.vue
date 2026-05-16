@@ -111,7 +111,7 @@ async function submitDelete() {
     <div class="settings-sidebar">
       <div class="settings-logo">
         <router-link to="/" style="display: flex; align-items: center; gap: 8px; text-decoration: none;">
-          <img :src="'/logo.png'" alt="Morgan" style="height: 38px; border-radius: 5px; display: block;" />
+          <img :src="'/logo.svg'" alt="Morgan" style="height: 38px; border-radius: 5px; display: block;" />
           <span style="font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--accent);">Morgan</span>
         </router-link>
         <div class="settings-logo-sub">AI · OP. III</div>

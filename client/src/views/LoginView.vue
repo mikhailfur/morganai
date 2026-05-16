@@ -257,7 +257,7 @@ async function handleTelegramOAuth() {
                     "
                 >
                     <img
-                        :src="'/logo.png'"
+                        :src="'/logo.svg'"
                         alt="Morgan"
                         style="height: 44px; border-radius: 6px; display: block"
                     />

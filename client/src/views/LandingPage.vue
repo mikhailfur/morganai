@@ -31,7 +31,7 @@ onMounted(() => {
         <nav class="landing-nav">
             <div style="display: flex; align-items: center; gap: 10px">
                 <img
-                    :src="'/logo.png'"
+                    :src="'/logo.svg'"
                     alt="Morgan"
                     style="height: 48px; border-radius: 6px; display: block"
                 />
