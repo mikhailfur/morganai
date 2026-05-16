@@ -246,6 +246,8 @@ html.dark {
   }
   .m-input:focus {
     border-color: var(--accent2);
+    outline: 2px solid var(--accent2);
+    outline-offset: -2px;
   }
   html.dark .m-input {
     background: var(--bg-alt);
@@ -274,6 +276,8 @@ html.dark {
   }
   .m-textarea:focus {
     border-color: var(--accent2);
+    outline: 2px solid var(--accent2);
+    outline-offset: -2px;
   }
   html.dark .m-textarea {
     background: var(--bg-alt);
@@ -414,7 +418,7 @@ html.dark {
     font-size: 15px;
     color: var(--fg);
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.15s, border-left-color 0.15s;
     border: 2px solid transparent;
   }
   .nav-item:hover {
@@ -424,6 +428,7 @@ html.dark {
     background: var(--accent);
     color: var(--bg);
     border-color: var(--fg);
+    border-left-color: var(--accent2);
     box-shadow: var(--shadow-sm);
   }
   html.dark .nav-item.active {
@@ -501,6 +506,8 @@ html.dark {
     border-top: 2px solid var(--accent);
     color: var(--fg);
   }
+  .pricing-card:hover          { transform: translateY(-6px); }
+  .pricing-card.featured:hover { transform: translateY(-18px); }
 
   /* Legal sidebar item */
   .legal-item {
@@ -602,5 +609,7 @@ html.dark .washi-tape { display: none; }
 /* Responsive utilities */
 @media (max-width: 768px) {
   .display-heading { letter-spacing: -0.02em; }
-  .pricing-card.featured { transform: none; }
+  .pricing-card.featured       { transform: none; }
+  .pricing-card:hover          { transform: none; }
+  .pricing-card.featured:hover { transform: none; }
 }

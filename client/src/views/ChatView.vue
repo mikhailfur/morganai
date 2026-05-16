@@ -123,7 +123,9 @@ async function handleLogout() {
   <div class="chat-root">
 
     <!-- Mobile overlay -->
-    <div v-if="sidebarOpen" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 40;" @click="sidebarOpen = false" class="md-hidden" />
+    <Transition name="overlay-fade">
+      <div v-if="sidebarOpen" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 40;" @click="sidebarOpen = false" class="md-hidden" />
+    </Transition>
 
     <!-- SIDEBAR -->
     <aside :style="{
@@ -338,13 +340,14 @@ async function handleLogout() {
 
     <!-- MODES MODAL -->
     <Teleport to="body">
-      <div v-if="showModes" style="
-        position: fixed; inset: 0;
-        background: rgba(0,0,0,0.6);
-        z-index: 200;
-        display: flex; align-items: center; justify-content: center;
-        padding: 24px;
-      " @click.self="showModes = false">
+      <Transition name="modal-pop">
+        <div v-if="showModes" style="
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,0.6);
+          z-index: 200;
+          display: flex; align-items: center; justify-content: center;
+          padding: 24px;
+        " @click.self="showModes = false">
         <div style="
           background: var(--bg);
           border: var(--border);
@@ -354,7 +357,7 @@ async function handleLogout() {
           max-width: 560px;
           max-height: 90vh;
           overflow-y: auto;
-        " class="animate-fade-in">
+        ">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
             <div class="editorial-label" style="color: var(--accent2);">
               <span style="opacity: 0.55;">01</span>
@@ -394,12 +397,26 @@ async function handleLogout() {
           </div>
         </div>
       </div>
+      </Transition>
     </Teleport>
 
   </div>
 </template>
 
 <style scoped>
+/* Modal pop animation */
+.modal-pop-enter-active { animation: modalIn 0.2s ease-out; }
+.modal-pop-leave-active { animation: modalIn 0.15s ease-in reverse; }
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.97) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+/* Mobile overlay fade */
+.overlay-fade-enter-active,
+.overlay-fade-leave-active { transition: opacity 0.25s; }
+.overlay-fade-enter-from,
+.overlay-fade-leave-to { opacity: 0; }
+
 /* Root layout — dvh for proper mobile browser chrome handling */
 .chat-root {
   height: 100vh;

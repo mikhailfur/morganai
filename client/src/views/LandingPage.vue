@@ -678,6 +678,11 @@ section.features {
     padding: 24px;
     border: var(--border);
     background: var(--bg);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.feature-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-box);
 }
 @media (max-width: 768px) {
     section.features {

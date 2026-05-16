@@ -522,7 +522,7 @@ async function handleTelegramOAuth() {
                 <button
                     @click="handleTelegramOAuth"
                     class="btn-ghost"
-                    style="padding: 12px"
+                    style="height: 44px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;"
                 >
                     <svg
                         width="16"

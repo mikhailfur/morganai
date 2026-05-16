@@ -337,7 +337,7 @@ async function submitDelete() {
   padding: 24px 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow-y: hidden;
 }
 .settings-logo { padding: 0 20px 14px; }
 .settings-logo-sub {
