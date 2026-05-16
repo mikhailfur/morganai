@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import type { ChatMessage, Character } from '../types';
+import type { ChatMessage, Character, UserCharacter } from '../types';
 
 const apiFetch = (url: string, opts: RequestInit = {}) =>
   fetch(url, { ...opts, credentials: 'include', headers: { 'Content-Type': 'application/json', ...((opts as any).headers || {}) } });
@@ -10,6 +10,8 @@ const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<ChatMessage[]>([]);
   const characters = ref<Character[]>([]);
+  const myCharacters = ref<UserCharacter[]>([]);
+  const publicCharacters = ref<UserCharacter[]>([]);
   const isLoading = ref(false);
   const isStreaming = ref(false);
 
@@ -123,5 +125,61 @@ export const useChatStore = defineStore('chat', () => {
     } catch { /* */ }
   }
 
-  return { messages, characters, isLoading, isStreaming, fetchHistory, sendMessage, sendImage, clearHistory, fetchCharacters };
+  async function fetchMyCharacters() {
+    try {
+      const res = await apiFetch('/api/user/characters/my');
+      const data = await res.json();
+      myCharacters.value = data.characters || [];
+    } catch { /* */ }
+  }
+
+  async function fetchPublicCharacters() {
+    try {
+      const res = await apiFetch('/api/auth/characters/public');
+      const data = await res.json();
+      publicCharacters.value = data.characters || [];
+    } catch { /* */ }
+  }
+
+  async function createUserCharacter(data: {
+    name: string; description?: string; system_prompt: string;
+    greeting_message?: string; avatar_url?: string; is_public?: boolean;
+  }): Promise<UserCharacter> {
+    const res = await apiFetch('/api/user/characters', { method: 'POST', body: JSON.stringify(data) });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error);
+    myCharacters.value.unshift(result.character);
+    return result.character;
+  }
+
+  async function updateUserCharacter(id: number, data: Partial<UserCharacter>): Promise<UserCharacter> {
+    const res = await apiFetch(`/api/user/characters/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error);
+    const idx = myCharacters.value.findIndex(c => c.id === id);
+    if (idx !== -1) myCharacters.value[idx] = result.character;
+    return result.character;
+  }
+
+  async function deleteUserCharacter(id: number): Promise<void> {
+    const res = await apiFetch(`/api/user/characters/${id}`, { method: 'DELETE' });
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+    myCharacters.value = myCharacters.value.filter(c => c.id !== id);
+  }
+
+  async function togglePublishCharacter(id: number): Promise<boolean> {
+    const res = await apiFetch(`/api/user/characters/${id}/publish`, { method: 'PATCH' });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error);
+    const idx = myCharacters.value.findIndex(c => c.id === id);
+    if (idx !== -1) myCharacters.value[idx].is_public = result.is_public;
+    return result.is_public;
+  }
+
+  return {
+    messages, characters, myCharacters, publicCharacters, isLoading, isStreaming,
+    fetchHistory, sendMessage, sendImage, clearHistory, fetchCharacters,
+    fetchMyCharacters, fetchPublicCharacters, createUserCharacter, updateUserCharacter,
+    deleteUserCharacter, togglePublishCharacter,
+  };
 });

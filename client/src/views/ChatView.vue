@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
 import { useThemeStore } from '../stores/theme'
+import CharacterPickerModal from '../components/CharacterPickerModal.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -16,10 +17,20 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const isRecording = ref(false)
 const sidebarOpen = ref(false)
 const showModes = ref(false)
+const showCharacterPicker = ref(false)
 const isMobile = ref(window.innerWidth < 768)
 
 const currentCharacter = computed(() => auth.user?.selected_character || 'morgan')
-const currentCharObj = computed(() => chat.characters.find(c => c.slug === currentCharacter.value))
+// Текущий объект — ищем сначала в canonical, потом в user characters (по slug uc:ID)
+const currentCharObj = computed(() => {
+  const slug = currentCharacter.value
+  if (slug.startsWith('uc:')) {
+    const id = parseInt(slug.slice(3), 10)
+    return chat.myCharacters.find(c => c.id === id) ||
+           chat.publicCharacters.find(c => c.id === id)
+  }
+  return chat.characters.find(c => c.slug === slug)
+})
 
 const chatGreetings = [
   '«Ты опоздал. Но я готова простить — если напишешь что-нибудь интересное.»',
@@ -35,6 +46,7 @@ const randomGreeting = chatGreetings[Math.floor(Math.random() * chatGreetings.le
 
 onMounted(async () => {
   await chat.fetchCharacters()
+  await chat.fetchMyCharacters()
   await chat.fetchHistory(currentCharacter.value)
   scrollToBottom()
 })
@@ -111,6 +123,7 @@ async function switchCharacter(slug: string) {
   await auth.updateSettings({ selected_character: slug })
   await chat.fetchHistory(slug)
   sidebarOpen.value = false
+  showCharacterPicker.value = false
 }
 
 async function handleLogout() {
@@ -155,6 +168,21 @@ async function handleLogout() {
 
       <!-- Characters -->
       <div style="flex: 1; overflow-y: auto;">
+        <!-- Current character display -->
+        <button
+          @click="showCharacterPicker = true; sidebarOpen = false"
+          class="nav-item"
+          style="width: 100%; text-align: left; border-bottom: var(--border);"
+        >
+          <div style="font-size: 14px; line-height: 1.2; display: flex; align-items: center; justify-content: space-between;">
+            <span>{{ currentCharObj?.name || 'Морган' }}</span>
+            <span style="font-family: var(--font-mono); font-size: 9px; opacity: 0.6; letter-spacing: 1px;">↕ сменить</span>
+          </div>
+          <div style="font-family: var(--font-mono); font-size: 9px; opacity: 0.6; margin-top: 3px; letter-spacing: 1px; text-transform: uppercase;">
+            активный персонаж
+          </div>
+        </button>
+        <!-- Canonical quick list -->
         <button
           v-for="c in chat.characters" :key="c.slug"
           @click="switchCharacter(c.slug)"
@@ -166,8 +194,16 @@ async function handleLogout() {
             <span v-if="c.is_premium" style="font-family: var(--font-mono); font-size: 9px; color: var(--meta); letter-spacing: 1px;">✦</span>
           </div>
           <div style="font-family: var(--font-mono); font-size: 9px; opacity: 0.6; margin-top: 3px; letter-spacing: 1px; text-transform: uppercase; font-weight: 400;">
-            {{ c.description?.slice(0, 28) }}{{ c.description?.length > 28 ? '...' : '' }}
+            {{ c.description?.slice(0, 28) }}{{ (c.description?.length ?? 0) > 28 ? '...' : '' }}
           </div>
+        </button>
+        <!-- All characters button -->
+        <button
+          @click="showCharacterPicker = true; sidebarOpen = false"
+          class="nav-item"
+          style="width: 100%; text-align: left; opacity: 0.7; font-size: 12px;"
+        >
+          ✦ Все персонажи и мои...
         </button>
       </div>
 
@@ -399,6 +435,14 @@ async function handleLogout() {
       </div>
       </Transition>
     </Teleport>
+
+    <!-- Character Picker Modal -->
+    <CharacterPickerModal
+      :visible="showCharacterPicker"
+      :current-slug="currentCharacter"
+      @close="showCharacterPicker = false"
+      @select="switchCharacter"
+    />
 
   </div>
 </template>

@@ -1,0 +1,187 @@
+{
+  "nav": {
+    "home": "",
+    "pricing": "",
+    "legal": "",
+    "login": "",
+    "register": "",
+    "chat": "",
+    "settings": "",
+    "admin": "",
+    "logout": "",
+    "theme_light": "",
+    "theme_dark": ""
+  },
+  "landing": {
+    "hero": {
+      "title": "",
+      "subtitle": "",
+      "cta_primary": "",
+      "cta_secondary": ""
+    },
+    "features": {
+      "title": "",
+      "chat": "",
+      "voice": "",
+      "characters": "",
+      "nsfw": ""
+    },
+    "footer": {
+      "copyright": ""
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "",
+      "email": "",
+      "password": "",
+      "button": "",
+      "no_account": "",
+      "register_link": "",
+      "google": "",
+      "telegram": "",
+      "error_invalid": ""
+    },
+    "register": {
+      "title": "",
+      "name": "",
+      "email": "",
+      "password": "",
+      "button": "",
+      "have_account": "",
+      "login_link": "",
+      "age_confirm": "",
+      "error_exists": ""
+    }
+  },
+  "chat": {
+    "placeholder": "",
+    "send": "",
+    "clear_history": "",
+    "limit_reached": "",
+    "limit_resets": "",
+    "characters_title": "",
+    "canonical": "",
+    "community": "",
+    "my_characters": "",
+    "create_character": "",
+    "premium_required": "",
+    "voice_playing": "",
+    "thinking": ""
+  },
+  "settings": {
+    "title": "",
+    "mode": {
+      "title": "",
+      "default": "",
+      "study": "",
+      "work": "",
+      "psychologist": "",
+      "nsfw": ""
+    },
+    "kyc": {
+      "button": "",
+      "description": "",
+      "verified": "",
+      "geo_blocked": "",
+      "modal_title": "",
+      "modal_text": "",
+      "modal_checkbox": "",
+      "modal_confirm": "",
+      "modal_cancel": ""
+    },
+    "password": {
+      "title": "",
+      "current": "",
+      "new": "",
+      "confirm": "",
+      "button": "",
+      "success": ""
+    },
+    "account": {
+      "title": "",
+      "delete": "",
+      "delete_confirm": "",
+      "delete_button": ""
+    },
+    "subscription": {
+      "free": "",
+      "premium": "",
+      "premium_plus": "",
+      "expires": "",
+      "upgrade": ""
+    }
+  },
+  "characters": {
+    "editor": {
+      "title_create": "",
+      "title_edit": "",
+      "name": "",
+      "description": "",
+      "system_prompt": "",
+      "greeting": "",
+      "avatar": "",
+      "is_public": "",
+      "save": "",
+      "delete": "",
+      "cancel": "",
+      "name_placeholder": "",
+      "description_placeholder": "",
+      "prompt_placeholder": "",
+      "greeting_placeholder": ""
+    }
+  },
+  "legal": {
+    "title": "",
+    "support": "",
+    "contacts": "",
+    "short": "",
+    "updated": "",
+    "document": "",
+    "documents": ""
+  },
+  "pricing": {
+    "title": "",
+    "free": {
+      "name": "",
+      "price": "",
+      "period": ""
+    },
+    "premium": {
+      "name": "",
+      "price": "",
+      "period": ""
+    },
+    "premium_plus": {
+      "name": "",
+      "price": "",
+      "period": ""
+    },
+    "messages_per_day": "",
+    "unlimited": "",
+    "voice": "",
+    "nsfw": "",
+    "all_characters": ""
+  },
+  "errors": {
+    "network": "",
+    "unauthorized": "",
+    "forbidden": "",
+    "not_found": "",
+    "server": "",
+    "banned": ""
+  },
+  "common": {
+    "save": "",
+    "cancel": "",
+    "delete": "",
+    "edit": "",
+    "close": "",
+    "loading": "",
+    "error": "",
+    "success": "",
+    "confirm": "",
+    "back": "",
+    "or": ""
+  }
+}

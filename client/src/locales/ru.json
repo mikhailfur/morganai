@@ -1,0 +1,187 @@
+{
+  "nav": {
+    "home": "Главная",
+    "pricing": "Тарифы",
+    "legal": "Политика",
+    "login": "Войти",
+    "register": "Зарегистрироваться",
+    "chat": "Чат",
+    "settings": "Настройки",
+    "admin": "Админ",
+    "logout": "Выйти",
+    "theme_light": "СВЕТ",
+    "theme_dark": "НОЧЬ"
+  },
+  "landing": {
+    "hero": {
+      "title": "Твой AI-компаньон",
+      "subtitle": "Общайся, играй роли, исследуй — с персонажами, которые запоминают тебя.",
+      "cta_primary": "Начать бесплатно",
+      "cta_secondary": "Тарифы"
+    },
+    "features": {
+      "title": "Возможности",
+      "chat": "Умный чат",
+      "voice": "Голосовые ответы",
+      "characters": "Персонажи",
+      "nsfw": "18+ режим"
+    },
+    "footer": {
+      "copyright": "© 2026 Morgan AI"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Вход",
+      "email": "Email",
+      "password": "Пароль",
+      "button": "Войти",
+      "no_account": "Нет аккаунта?",
+      "register_link": "Зарегистрироваться",
+      "google": "Войти через Google",
+      "telegram": "Войти через Telegram",
+      "error_invalid": "Неверный email или пароль"
+    },
+    "register": {
+      "title": "Регистрация",
+      "name": "Имя",
+      "email": "Email",
+      "password": "Пароль",
+      "button": "Создать аккаунт",
+      "have_account": "Уже есть аккаунт?",
+      "login_link": "Войти",
+      "age_confirm": "Мне исполнилось 18 лет",
+      "error_exists": "Email уже зарегистрирован"
+    }
+  },
+  "chat": {
+    "placeholder": "Напиши что-нибудь...",
+    "send": "Отправить",
+    "clear_history": "Очистить историю",
+    "limit_reached": "Дневной лимит исчерпан",
+    "limit_resets": "Обновится в полночь UTC",
+    "characters_title": "Персонажи",
+    "canonical": "Каноничные",
+    "community": "Сообщество",
+    "my_characters": "Мои персонажи",
+    "create_character": "+ Создать",
+    "premium_required": "Требуется Premium",
+    "voice_playing": "Воспроизведение...",
+    "thinking": "думает"
+  },
+  "settings": {
+    "title": "Настройки",
+    "mode": {
+      "title": "Режим поведения",
+      "default": "По умолчанию",
+      "study": "Учёба",
+      "work": "Работа",
+      "psychologist": "Психолог",
+      "nsfw": "18+"
+    },
+    "kyc": {
+      "button": "Подтвердить возраст 18+",
+      "description": "Разблокирует NSFW без Premium",
+      "verified": "Возраст подтверждён",
+      "geo_blocked": "NSFW недоступен в вашем регионе",
+      "modal_title": "Подтверждение возраста",
+      "modal_text": "Этот раздел содержит контент для взрослых 18+.",
+      "modal_checkbox": "Я подтверждаю, что мне исполнилось 18 лет",
+      "modal_confirm": "Подтвердить",
+      "modal_cancel": "Отмена"
+    },
+    "password": {
+      "title": "Сменить пароль",
+      "current": "Текущий пароль",
+      "new": "Новый пароль",
+      "confirm": "Подтвердить",
+      "button": "Сохранить",
+      "success": "Пароль изменён"
+    },
+    "account": {
+      "title": "Аккаунт",
+      "delete": "Удалить аккаунт",
+      "delete_confirm": "Введите пароль для подтверждения",
+      "delete_button": "Удалить навсегда"
+    },
+    "subscription": {
+      "free": "Free",
+      "premium": "Premium",
+      "premium_plus": "Premium+",
+      "expires": "до {date}",
+      "upgrade": "Улучшить"
+    }
+  },
+  "characters": {
+    "editor": {
+      "title_create": "Создать персонажа",
+      "title_edit": "Редактировать персонажа",
+      "name": "Имя",
+      "description": "Описание",
+      "system_prompt": "Системный промпт",
+      "greeting": "Приветственное сообщение",
+      "avatar": "Аватар",
+      "is_public": "Публичный (виден другим пользователям)",
+      "save": "Сохранить",
+      "delete": "Удалить",
+      "cancel": "Отмена",
+      "name_placeholder": "Имя персонажа",
+      "description_placeholder": "Краткое описание для карточки",
+      "prompt_placeholder": "Инструкция для AI: характер, стиль общения, фон...",
+      "greeting_placeholder": "Первое сообщение персонажа пользователю"
+    }
+  },
+  "legal": {
+    "title": "Правовые документы",
+    "support": "Поддержка",
+    "contacts": "Вопросы?",
+    "short": "Кратко",
+    "updated": "обновлено",
+    "document": "ДОКУМЕНТ",
+    "documents": "ДОКУМЕНТЫ"
+  },
+  "pricing": {
+    "title": "Тарифы",
+    "free": {
+      "name": "Free",
+      "price": "0₽",
+      "period": "навсегда"
+    },
+    "premium": {
+      "name": "Premium",
+      "price": "299₽",
+      "period": "в месяц"
+    },
+    "premium_plus": {
+      "name": "Premium+",
+      "price": "599₽",
+      "period": "в месяц"
+    },
+    "messages_per_day": "{n} сообщений/день",
+    "unlimited": "Без лимита",
+    "voice": "Голосовые ответы",
+    "nsfw": "NSFW-режим",
+    "all_characters": "Все персонажи"
+  },
+  "errors": {
+    "network": "Ошибка сети. Попробуйте снова.",
+    "unauthorized": "Необходима авторизация.",
+    "forbidden": "Доступ запрещён.",
+    "not_found": "Страница не найдена.",
+    "server": "Ошибка сервера.",
+    "banned": "Аккаунт заблокирован."
+  },
+  "common": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "close": "Закрыть",
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "success": "Готово",
+    "confirm": "Подтвердить",
+    "back": "Назад",
+    "or": "или"
+  }
+}

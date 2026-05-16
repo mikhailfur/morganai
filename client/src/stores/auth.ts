@@ -122,6 +122,13 @@ export const useAuthStore = defineStore('auth', () => {
     if (res.ok && user.value) user.value.kyc_verified = true;
   }
 
+  async function startKycSession(): Promise<{ session_url?: string; already_verified?: boolean }> {
+    const res = await fetch(`${API}/kyc/session`, { method: 'POST', credentials: 'include' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Ошибка KYC');
+    return data;
+  }
+
   async function changePassword(currentPassword: string, newPassword: string) {
     const res = await fetch(`${API}/user/change-password`, {
       method: 'POST',
@@ -151,6 +158,6 @@ export const useAuthStore = defineStore('auth', () => {
     user, loading, appConfig,
     isAuthenticated, isAdmin, isPremium, isKycVerified, canNsfw,
     fetchAppConfig, fetchUser, register, login, loginWithGoogle, loginWithTelegram, logout,
-    updateSettings, verifyKyc, changePassword, deleteAccount,
+    updateSettings, verifyKyc, startKycSession, changePassword, deleteAccount,
   };
 });

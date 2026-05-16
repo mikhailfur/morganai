@@ -4,14 +4,30 @@ import { openrouterClient } from '../openrouter';
 import { memoryManager } from '../memory';
 import { getBehaviorPrompt, injectPromptVariables } from '../prompt';
 import { minimaxTTS } from '../voice';
+import type { GeoBlockRequest } from '../middleware/geoblock';
 
 const router = Router();
+
+// Resolves a canonical character OR a user character (slug: "uc:ID")
+async function resolveCharacter(slug: string, userId: number): Promise<any | null> {
+  if (slug.startsWith('uc:')) {
+    const id = parseInt(slug.slice(3), 10);
+    if (!id) return null;
+    const uc = await database.getUserCharacterById(id);
+    if (!uc) return null;
+    // Must be either the owner or public
+    if (!uc.is_public && uc.user_id !== userId) return null;
+    return { ...uc, slug, is_premium: false };
+  }
+  return database.getCharacterBySlug(slug);
+}
 
 const buildContext = async (userId: number, slug: string, clientTimezone?: string) => {
   const user = await database.getUserById(userId);
   if (!user) return null;
 
-  const character = await database.getCharacterBySlug(slug || user.selected_character || 'morgan');
+  const resolvedSlug = slug || user.selected_character || 'morgan';
+  const character = await resolveCharacter(resolvedSlug, userId);
   if (!character) return null;
 
   const isPremium = await database.checkSubscription(userId);
@@ -52,8 +68,13 @@ router.post('/send', async (req: any, res: Response) => {
     const user = await database.getUserById(userId);
     if (!user) { res.status(404).json({ error: 'Пользователь не найден' }); return; }
 
+    if (user.behavior_mode === 'nsfw' && (req as GeoBlockRequest).nsfwGeoBlocked) {
+      res.status(403).json({ error: 'NSFW недоступен в вашем регионе', geo_blocked: true });
+      return;
+    }
+
     const slug = characterSlug || user.selected_character || 'morgan';
-    const character = await database.getCharacterBySlug(slug);
+    const character = await resolveCharacter(slug, userId);
     if (!character) { res.status(404).json({ error: 'Персонаж не найден' }); return; }
 
     const isPremium = await database.checkSubscription(userId);
@@ -128,8 +149,13 @@ router.post('/stream', async (req: any, res: Response) => {
     const user = await database.getUserById(userId);
     if (!user) { res.status(404).json({ error: 'Не найден' }); return; }
 
+    if (user.behavior_mode === 'nsfw' && (req as GeoBlockRequest).nsfwGeoBlocked) {
+      res.status(403).json({ error: 'NSFW недоступен в вашем регионе', geo_blocked: true });
+      return;
+    }
+
     const slug = characterSlug || user.selected_character || 'morgan';
-    const character = await database.getCharacterBySlug(slug);
+    const character = await resolveCharacter(slug, userId);
     if (!character) { res.status(404).json({ error: 'Персонаж не найден' }); return; }
 
     const isPremium = await database.checkSubscription(userId);

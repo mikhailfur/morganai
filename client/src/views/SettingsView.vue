@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useThemeStore } from '../stores/theme'
 
 const auth = useAuthStore()
 const theme = useThemeStore()
 const router = useRouter()
+const route = useRoute()
 
 const modes = [
   { id: 'default',      sym: 'i',   kanji: '常', name: 'Обычный',   desc: 'Стандартный ролевой режим. NSFW фильтр включён.' },
@@ -17,6 +18,7 @@ const modes = [
 ]
 
 const modeError = ref('')
+const nsfwGeoBlocked = ref(false)
 async function setMode(mode: string) {
   const m = modes.find(m => m.id === mode)
   if (m?.restricted && !auth.canNsfw) {
@@ -27,24 +29,52 @@ async function setMode(mode: string) {
   try {
     await auth.updateSettings({ behavior_mode: mode })
     modeError.value = ''
+    nsfwGeoBlocked.value = false
   } catch (e: any) {
-    modeError.value = e.message
-    setTimeout(() => modeError.value = '', 3000)
+    const msg: string = e.message || ''
+    if (msg.includes('регион') || msg.includes('geo')) {
+      nsfwGeoBlocked.value = true
+      modeError.value = 'NSFW недоступен в вашем регионе'
+    } else {
+      modeError.value = msg
+    }
+    setTimeout(() => modeError.value = '', 4000)
   }
 }
 
-// === KYC ===
+// === KYC (Didit) ===
 const showKyc = ref(false)
-const kycChecked = ref(false)
 const kycLoading = ref(false)
-async function confirmKyc() {
-  if (!kycChecked.value) return
+const kycError = ref('')
+
+async function startKycVerification() {
   kycLoading.value = true
+  kycError.value = ''
   try {
-    await auth.verifyKyc()
-    showKyc.value = false
-  } finally { kycLoading.value = false }
+    const result = await auth.startKycSession()
+    if (result.already_verified) {
+      showKyc.value = false
+      await auth.fetchUser()
+      return
+    }
+    if (result.session_url) {
+      window.open(result.session_url, '_blank', 'noopener,noreferrer')
+      showKyc.value = false
+    }
+  } catch (e: any) {
+    kycError.value = e.message || 'Ошибка'
+  } finally {
+    kycLoading.value = false
+  }
 }
+
+// После возврата с Didit (?kyc=done) — перезагружаем пользователя
+onMounted(async () => {
+  if (route.query.kyc === 'done') {
+    await auth.fetchUser()
+    router.replace({ query: {} })
+  }
+})
 
 // === Change password ===
 const showPasswordModal = ref(false)
@@ -167,13 +197,17 @@ async function submitDelete() {
             <div v-if="auth.user?.behavior_mode === m.id" style="margin-top: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.4px; color: var(--accent); text-transform: uppercase;">● АКТИВНО</div>
           </div>
         </div>
-        <!-- KYC button for non-premium -->
-        <div v-if="!auth.isPremium && !auth.isKycVerified" style="margin-top: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <!-- Геоблокировка NSFW -->
+        <div v-if="nsfwGeoBlocked" style="margin-top: 12px; font-family: var(--font-mono); font-size: 10px; color: var(--accent2); letter-spacing: 1.2px; text-transform: uppercase;">
+          ✖ NSFW недоступен в вашем регионе
+        </div>
+        <!-- KYC кнопка для не-Premium без верификации -->
+        <div v-if="!auth.isPremium && !auth.isKycVerified && !nsfwGeoBlocked" style="margin-top: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
           <button class="btn-ghost btn-sm" @click="showKyc = true">Подтвердить возраст 18+</button>
           <span style="font-size: 12px; color: var(--fg-dim); font-family: var(--font-mono);">— разблокирует NSFW без Premium</span>
         </div>
         <div v-if="auth.isKycVerified && !auth.isPremium" style="margin-top: 10px; font-family: var(--font-mono); font-size: 10px; color: var(--meta); letter-spacing: 1.2px; text-transform: uppercase;">
-          ✓ Возраст подтверждён
+          ✓ Возраст подтверждён через Didit
         </div>
       </div>
 
@@ -243,21 +277,21 @@ async function submitDelete() {
     </div>
   </div>
 
-  <!-- KYC Modal -->
+  <!-- KYC Modal (Didit) -->
   <Teleport to="body">
     <div v-if="showKyc" class="modal-overlay" @click.self="showKyc = false">
       <div class="modal-box">
-        <div style="font-family: var(--font-display); font-size: 22px; font-weight: 600; margin-bottom: 12px;">Подтверждение возраста</div>
-        <p style="font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: var(--fg-dim);">
-          Контент 18+ предназначен только для совершеннолетних пользователей. Подтверждая возраст, вы берёте ответственность за использование данной функции.
+        <div style="font-family: var(--font-display); font-size: 22px; font-weight: 600; margin-bottom: 12px;">Подтверждение возраста 18+</div>
+        <p style="font-size: 14px; line-height: 1.6; margin-bottom: 12px; color: var(--fg-dim);">
+          Для доступа к NSFW-контенту необходимо пройти верификацию возраста через сервис <strong>Didit</strong>.
         </p>
-        <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 14px; line-height: 1.5;">
-          <input type="checkbox" v-model="kycChecked" style="margin-top: 2px; cursor: pointer;" />
-          Я подтверждаю, что мне исполнилось 18 лет
-        </label>
-        <div style="margin-top: 20px; display: flex; gap: 8px;">
-          <button class="btn-primary btn-sm" :disabled="!kycChecked || kycLoading" @click="confirmKyc">
-            {{ kycLoading ? 'Сохранение...' : 'Подтвердить' }}
+        <p style="font-size: 13px; line-height: 1.5; margin-bottom: 20px; color: var(--fg-dim); opacity: 0.8;">
+          После нажатия кнопки откроется новая вкладка с формой верификации. Вернитесь на эту страницу после завершения — статус обновится автоматически.
+        </p>
+        <div v-if="kycError" style="padding: 8px 12px; background: var(--bg-alt); border-left: 3px solid var(--accent2); font-size: 13px; color: var(--accent2); margin-bottom: 12px;">{{ kycError }}</div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn-primary btn-sm" :disabled="kycLoading" @click="startKycVerification">
+            {{ kycLoading ? 'Открываем...' : 'Начать верификацию' }}
           </button>
           <button class="btn-ghost btn-sm" @click="showKyc = false">Отмена</button>
         </div>

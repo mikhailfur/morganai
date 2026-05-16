@@ -206,4 +206,17 @@ router.post('/telegram', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/auth/characters/public — публичные пользовательские персонажи (без auth)
+router.get('/characters/public', async (_req, res: Response) => {
+  try {
+    const chars = await database.getPublicUserCharacters();
+    res.json({ characters: chars.map((c: any) => ({
+      id: c.id, name: c.name, description: c.description, avatar_url: c.avatar_url,
+      greeting_message: c.greeting_message, is_public: true, author_name: c.author_name,
+    })) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
 export default router;

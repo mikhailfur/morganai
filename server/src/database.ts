@@ -156,6 +156,25 @@ class Database {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
 
+      // User-created characters
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS user_characters (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          description TEXT,
+          avatar_url VARCHAR(500) DEFAULT NULL,
+          system_prompt TEXT NOT NULL,
+          greeting_message TEXT DEFAULT NULL,
+          is_public BOOLEAN DEFAULT 0,
+          sort_order INT DEFAULT 0,
+          created_at BIGINT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          INDEX idx_user_id (user_id),
+          INDEX idx_public (is_public)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
       // Seed plan limits defaults
       await this.pool.execute(`
         INSERT IGNORE INTO plan_limits (plan_type, daily_message_limit, context_messages, context_chars, voice_limit, voice_window_hours, updated_at)
@@ -400,6 +419,64 @@ class Database {
   async getCharacterBySlug(slug: string): Promise<any> {
     const [rows] = await this.pool.execute('SELECT * FROM characters WHERE slug = ?', [slug]);
     return (rows as any[])[0] || null;
+  }
+
+  // === User characters methods ===
+
+  async createUserCharacter(userId: number, data: {
+    name: string; description?: string; system_prompt: string;
+    greeting_message?: string; avatar_url?: string; is_public?: boolean;
+  }): Promise<number> {
+    const [result] = await this.pool.execute(
+      `INSERT INTO user_characters (user_id, name, description, system_prompt, greeting_message, avatar_url, is_public, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, data.name, data.description || null, data.system_prompt, data.greeting_message || null, data.avatar_url || null, data.is_public ? 1 : 0, Date.now()]
+    );
+    return (result as any).insertId;
+  }
+
+  async getUserCharacters(userId: number): Promise<any[]> {
+    const [rows] = await this.pool.execute(
+      'SELECT * FROM user_characters WHERE user_id = ? ORDER BY sort_order, created_at DESC',
+      [userId]
+    );
+    return rows as any[];
+  }
+
+  async getPublicUserCharacters(): Promise<any[]> {
+    const [rows] = await this.pool.execute(
+      'SELECT uc.*, u.username as author_name FROM user_characters uc JOIN users u ON uc.user_id = u.id WHERE uc.is_public = 1 ORDER BY uc.sort_order, uc.created_at DESC LIMIT 100'
+    );
+    return rows as any[];
+  }
+
+  async getUserCharacterById(id: number, userId?: number): Promise<any> {
+    const sql = userId
+      ? 'SELECT * FROM user_characters WHERE id = ? AND user_id = ?'
+      : 'SELECT * FROM user_characters WHERE id = ?';
+    const params = userId ? [id, userId] : [id];
+    const [rows] = await this.pool.execute(sql, params);
+    return (rows as any[])[0] || null;
+  }
+
+  async updateUserCharacter(id: number, userId: number, data: {
+    name?: string; description?: string; system_prompt?: string;
+    greeting_message?: string; avatar_url?: string; is_public?: boolean;
+  }): Promise<void> {
+    const sets: string[] = [];
+    const vals: any[] = [];
+    if (data.name !== undefined) { sets.push('name = ?'); vals.push(data.name); }
+    if (data.description !== undefined) { sets.push('description = ?'); vals.push(data.description || null); }
+    if (data.system_prompt !== undefined) { sets.push('system_prompt = ?'); vals.push(data.system_prompt); }
+    if (data.greeting_message !== undefined) { sets.push('greeting_message = ?'); vals.push(data.greeting_message || null); }
+    if (data.avatar_url !== undefined) { sets.push('avatar_url = ?'); vals.push(data.avatar_url || null); }
+    if (data.is_public !== undefined) { sets.push('is_public = ?'); vals.push(data.is_public ? 1 : 0); }
+    if (sets.length === 0) return;
+    vals.push(id, userId);
+    await this.pool.execute(`UPDATE user_characters SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`, vals);
+  }
+
+  async deleteUserCharacter(id: number, userId: number): Promise<void> {
+    await this.pool.execute('DELETE FROM user_characters WHERE id = ? AND user_id = ?', [id, userId]);
   }
 
   // === Chat history methods ===

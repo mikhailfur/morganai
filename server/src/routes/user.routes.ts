@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { database } from '../database';
 import { comparePassword, hashPassword, COOKIE_NAME } from '../auth';
+import type { GeoBlockRequest } from '../middleware/geoblock';
 
 const router = Router();
 
@@ -25,6 +26,10 @@ router.put('/settings', async (req: any, res: Response) => {
       const validModes = ['default', 'study', 'work', 'psychologist', 'nsfw'];
       if (!validModes.includes(behavior_mode)) { res.status(400).json({ error: 'Неверный режим' }); return; }
       if (behavior_mode === 'nsfw') {
+        if ((req as GeoBlockRequest).nsfwGeoBlocked) {
+          res.status(403).json({ error: 'NSFW недоступен в вашем регионе', geo_blocked: true });
+          return;
+        }
         const user = await database.getUserById(userId);
         const isPremium = await database.checkSubscription(userId);
         if (!isPremium && !user?.kyc_verified) {
@@ -116,7 +121,7 @@ router.delete('/account', async (req: any, res: Response) => {
   }
 });
 
-// Get characters list
+// Get canonical characters list
 router.get('/characters', async (_req: any, res: Response) => {
   try {
     const characters = await database.getCharacters();
@@ -124,6 +129,86 @@ router.get('/characters', async (_req: any, res: Response) => {
       slug: c.slug, name: c.name, description: c.description,
       avatar_url: c.avatar_url, is_premium: Boolean(c.is_premium),
     }))});
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// === User characters (пользовательские персонажи) ===
+
+const formatUserChar = (c: any) => ({
+  id: c.id, user_id: c.user_id, name: c.name, description: c.description,
+  avatar_url: c.avatar_url, system_prompt: c.system_prompt,
+  greeting_message: c.greeting_message, is_public: Boolean(c.is_public),
+  created_at: c.created_at, author_name: c.author_name,
+});
+
+// GET /api/user/characters/my — мои персонажи
+router.get('/characters/my', async (req: any, res: Response) => {
+  try {
+    const chars = await database.getUserCharacters(req.user.userId);
+    res.json({ characters: chars.map(formatUserChar) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// POST /api/user/characters — создать персонажа
+router.post('/characters', async (req: any, res: Response) => {
+  try {
+    const { name, description, system_prompt, greeting_message, avatar_url, is_public } = req.body;
+    if (!name?.trim()) { res.status(400).json({ error: 'Имя обязательно' }); return; }
+    if (!system_prompt?.trim()) { res.status(400).json({ error: 'Системный промпт обязателен' }); return; }
+    const id = await database.createUserCharacter(req.user.userId, {
+      name: name.trim(), description, system_prompt: system_prompt.trim(),
+      greeting_message, avatar_url, is_public: Boolean(is_public),
+    });
+    const char = await database.getUserCharacterById(id, req.user.userId);
+    res.status(201).json({ character: formatUserChar(char) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// PUT /api/user/characters/:id — редактировать своего персонажа
+router.put('/characters/:id', async (req: any, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const char = await database.getUserCharacterById(id, req.user.userId);
+    if (!char) { res.status(404).json({ error: 'Не найден' }); return; }
+    const { name, description, system_prompt, greeting_message, avatar_url, is_public } = req.body;
+    await database.updateUserCharacter(id, req.user.userId, {
+      name, description, system_prompt, greeting_message, avatar_url,
+      is_public: is_public !== undefined ? Boolean(is_public) : undefined,
+    });
+    const updated = await database.getUserCharacterById(id, req.user.userId);
+    res.json({ character: formatUserChar(updated) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// PATCH /api/user/characters/:id/publish — переключить публичность
+router.patch('/characters/:id/publish', async (req: any, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const char = await database.getUserCharacterById(id, req.user.userId);
+    if (!char) { res.status(404).json({ error: 'Не найден' }); return; }
+    await database.updateUserCharacter(id, req.user.userId, { is_public: !char.is_public });
+    res.json({ is_public: !Boolean(char.is_public) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// DELETE /api/user/characters/:id — удалить своего персонажа
+router.delete('/characters/:id', async (req: any, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const char = await database.getUserCharacterById(id, req.user.userId);
+    if (!char) { res.status(404).json({ error: 'Не найден' }); return; }
+    await database.deleteUserCharacter(id, req.user.userId);
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Ошибка' });
   }

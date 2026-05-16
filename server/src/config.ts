@@ -18,6 +18,11 @@ export interface Config {
   adminEmails: string[];
   port: number;
   clientUrl: string;
+  // Didit KYC
+  diditClientId: string;
+  diditClientSecret: string;
+  diditWorkflowId: string;
+  diditWebhookSecret: string;
 }
 
 export const config: Config = {
@@ -35,6 +40,11 @@ export const config: Config = {
   adminEmails: (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim()).filter(Boolean),
   port: parseInt(process.env.PORT || '3001'),
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
+  // Didit KYC
+  diditClientId: process.env.DIDIT_CLIENT_ID || '',
+  diditClientSecret: process.env.DIDIT_CLIENT_SECRET || '',
+  diditWorkflowId: process.env.DIDIT_WORKFLOW_ID || '',
+  diditWebhookSecret: process.env.DIDIT_WEBHOOK_SECRET || '',
 };
 
 export const validateConfig = (): void => {

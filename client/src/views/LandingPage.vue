@@ -400,6 +400,13 @@ onMounted(() => {
                     style="color: inherit; text-decoration: none; opacity: 0.7"
                     >Оферта</router-link
                 >
+                <a
+                    href="https://github.com/MikhailFur/morganai"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style="color: inherit; text-decoration: none; opacity: 0.7"
+                    >GitHub</a
+                >
                 <span>© 2026 Morgan AI</span>
             </div>
         </footer>

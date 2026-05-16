@@ -37,6 +37,19 @@ export interface Character {
   greeting_message?: string;
 }
 
+export interface UserCharacter {
+  id: number;
+  user_id: number;
+  name: string;
+  description?: string;
+  avatar_url?: string;
+  system_prompt: string;
+  greeting_message?: string;
+  is_public: boolean;
+  created_at: number;
+  author_name?: string;
+}
+
 export interface AuthResponse {
   user: User;
 }
