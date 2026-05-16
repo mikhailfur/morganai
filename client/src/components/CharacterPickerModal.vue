@@ -150,7 +150,7 @@ function onEditorDeleted(id: number) {
                   <img v-if="c.avatar_url" :src="c.avatar_url" :alt="c.name" />
                   <span v-else class="char-avatar-placeholder">{{ c.name[0] }}</span>
                 </div>
-                <div style="flex: 1; min-width: 0;" @click="selectUserChar(c.id)" style="cursor: pointer;">
+                <div style="flex: 1; min-width: 0; cursor: pointer;" @click="selectUserChar(c.id)">
                   <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                     <span style="font-family: var(--font-display); font-weight: 600; font-size: 15px;">{{ c.name }}</span>
                     <span v-if="c.is_public" style="font-family: var(--font-mono); font-size: 9px; color: var(--meta); letter-spacing: 1px;">◎ публичный</span>
