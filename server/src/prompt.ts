@@ -18,7 +18,7 @@ export const getModulePrompt = (
     module = modules[0];
   }
 
-  const nsfwCheck = !module.isNsfw
+  const nsfwCheck = (!module.isNsfw && !(nsfwEnabled && canNsfw))
     ? `\n\n## Фильтр безопасности\nЕсли пользователь отправляет NSFW контент — верни: [NSFW_BLOCKED]\nРомантика, объятия, поцелуи — разрешены.`
     : '';
 
