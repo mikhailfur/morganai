@@ -5,14 +5,14 @@ import { database } from '../database';
 
 // Получить access token Didit (client_credentials flow)
 async function getDigitAccessToken(): Promise<string> {
-  const credentials = Buffer.from(`${config.diditClientId}:${config.diditClientSecret}`).toString('base64');
   const resp = await fetch('https://apx.didit.me/auth/v2/token/', {
     method: 'POST',
-    headers: {
-      'Authorization': `Basic ${credentials}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'grant_type=client_credentials',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: config.diditClientId,
+      client_secret: config.diditClientSecret,
+    }).toString(),
   });
   if (!resp.ok) {
     const errBody = await resp.text();
