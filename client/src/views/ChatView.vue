@@ -430,6 +430,16 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
           </div>
           <!-- Actions -->
           <div class="flex items-center gap-1">
+            <router-link v-if="auth.isAdmin" to="/admin"
+              class="flex size-7 items-center justify-center rounded-[6px]
+                     text-violet-400 hover:text-violet-300 hover:bg-violet-500/10
+                     transition-colors duration-150"
+              title="Панель администратора"
+            >
+              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </router-link>
             <router-link to="/settings"
               class="flex size-7 items-center justify-center rounded-[6px]
                      text-[var(--fg-subtle)] hover:text-[var(--fg)] hover:bg-[var(--surface-2)]

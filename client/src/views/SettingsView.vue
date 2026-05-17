@@ -17,8 +17,7 @@ const tabs = [
   { id: 'general',  label: 'Основные',    svg: 'M12 15a3 3 0 100-6 3 3 0 000 6z M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z' },
   { id: 'billing',  label: 'Подписка',    svg: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z' },
   { id: 'privacy',  label: 'Приватность', svg: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' },
-  { id: 'api',      label: 'API Ключи',   svg: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z' },
-  { id: 'account',  label: 'Аккаунт',     svg: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z', danger: true },
+{ id: 'account',  label: 'Аккаунт',     svg: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z', danger: true },
 ]
 const activeTab = ref('profile')
 
@@ -417,79 +416,6 @@ async function clearChat() {
                 Ваши диалоги хранятся в зашифрованном виде. Мы не продаём данные и не передаём третьим лицам.
                 Удалить все данные можно в разделе «Аккаунт».
               </p>
-            </Card>
-          </template>
-
-          <!-- ── API Keys ── -->
-          <template v-else-if="activeTab === 'api'">
-            <h2 class="text-xl font-semibold tracking-tight text-[var(--fg)]">API Ключи</h2>
-
-            <Card padding="md">
-              <div class="flex items-start gap-4">
-                <div class="flex size-10 shrink-0 items-center justify-center rounded-[10px]
-                            bg-violet-500/10 border border-violet-500/20">
-                  <svg class="size-5 text-violet-400" viewBox="0 0 24 24" fill="none"
-                       stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
-                  </svg>
-                </div>
-                <div>
-                  <div class="text-sm font-semibold text-[var(--fg)] mb-1">Управляется платформой</div>
-                  <p class="text-sm text-[var(--fg-muted)] leading-relaxed">
-                    API-ключи для языковых моделей настроены централизованно и не требуют конфигурации
-                    с вашей стороны. Вся обработка запросов происходит на серверах Morgan AI.
-                  </p>
-                </div>
-              </div>
-            </Card>
-
-            <Card padding="md">
-              <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-4">
-                Текущая конфигурация
-              </div>
-              <div class="space-y-3">
-                <div class="flex items-center justify-between py-2.5 border-b border-[var(--border)]">
-                  <span class="text-sm text-[var(--fg-muted)]">Языковая модель</span>
-                  <span class="font-mono text-xs text-violet-300 bg-violet-500/10 border border-violet-500/20
-                               px-2.5 py-1 rounded-full">
-                    DeepSeek Chat v4
-                  </span>
-                </div>
-                <div class="flex items-center justify-between py-2.5 border-b border-[var(--border)]">
-                  <span class="text-sm text-[var(--fg-muted)]">Провайдер</span>
-                  <span class="font-mono text-xs text-[var(--fg-muted)]">OpenRouter</span>
-                </div>
-                <div class="flex items-center justify-between py-2.5 border-b border-[var(--border)]">
-                  <span class="text-sm text-[var(--fg-muted)]">Потоковая передача</span>
-                  <span class="flex items-center gap-1.5 text-xs text-emerald-400">
-                    <span class="size-1.5 rounded-full bg-emerald-400 inline-block"></span>
-                    Включена
-                  </span>
-                </div>
-                <div class="flex items-center justify-between py-2.5">
-                  <span class="text-sm text-[var(--fg-muted)]">Кэширование промптов</span>
-                  <span class="flex items-center gap-1.5 text-xs text-emerald-400">
-                    <span class="size-1.5 rounded-full bg-emerald-400 inline-block"></span>
-                    Включено
-                  </span>
-                </div>
-              </div>
-            </Card>
-
-            <Card padding="md" class="border-[var(--border)]">
-              <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-3">
-                Голосовые ответы (TTS)
-              </div>
-              <div class="space-y-3">
-                <div class="flex items-center justify-between py-2.5 border-b border-[var(--border)]">
-                  <span class="text-sm text-[var(--fg-muted)]">Провайдер TTS</span>
-                  <span class="font-mono text-xs text-[var(--fg-muted)]">MiniMax</span>
-                </div>
-                <div class="flex items-center justify-between py-2.5">
-                  <span class="text-sm text-[var(--fg-muted)]">Голосовой движок</span>
-                  <span class="font-mono text-xs text-[var(--fg-muted)]">speech-2.6-turbo</span>
-                </div>
-              </div>
             </Card>
           </template>
 
