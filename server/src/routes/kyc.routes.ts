@@ -14,8 +14,12 @@ async function getDigitAccessToken(): Promise<string> {
     },
     body: 'grant_type=client_credentials',
   });
-  if (!resp.ok) throw new Error(`Didit auth error: ${resp.status}`);
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    throw new Error(`Didit auth failed (${resp.status}): ${errBody}`);
+  }
   const data = await resp.json() as { access_token: string };
+  if (!data.access_token) throw new Error('Didit auth: no access_token in response');
   return data.access_token;
 }
 
@@ -26,7 +30,11 @@ export const kycProtectedRouter = Router();
 kycProtectedRouter.post('/session', async (req: any, res: Response) => {
   try {
     if (!config.diditClientId || !config.diditWorkflowId) {
-      res.status(503).json({ error: 'KYC сервис не настроен' });
+      res.status(503).json({ error: 'KYC сервис не настроен (DIDIT_CLIENT_ID / DIDIT_WORKFLOW_ID не заданы)' });
+      return;
+    }
+    if (!config.diditClientSecret) {
+      res.status(503).json({ error: 'KYC сервис не настроен (DIDIT_CLIENT_SECRET не задан)' });
       return;
     }
 
@@ -41,32 +49,47 @@ kycProtectedRouter.post('/session', async (req: any, res: Response) => {
 
     const accessToken = await getDigitAccessToken();
 
+    // Строим callback из реального хоста запроса как фолбэк
+    const origin = config.clientUrl || `${req.protocol}://${req.get('host')}`;
+    const callbackUrl = `${origin}/settings?kyc=done`;
+
+    const sessionBody = {
+      workflow_id: config.diditWorkflowId,
+      vendor_data: String(userId),
+      callback: callbackUrl,
+    };
+
     const sessionResp = await fetch('https://apx.didit.me/v1/session/', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        workflow_id: config.diditWorkflowId,
-        // vendor_data возвращается в webhook — используем как ID пользователя
-        vendor_data: String(userId),
-        callback: `${config.clientUrl}/settings?kyc=done`,
-      }),
+      body: JSON.stringify(sessionBody),
     });
 
     if (!sessionResp.ok) {
       const errText = await sessionResp.text();
-      console.error('Didit session error:', errText);
-      res.status(502).json({ error: 'Ошибка создания KYC-сессии' });
+      console.error('Didit session error:', sessionResp.status, errText);
+      res.status(502).json({ error: `Ошибка Didit (${sessionResp.status}): ${errText}` });
       return;
     }
 
-    const session = await sessionResp.json() as { url: string; session_id: string };
-    res.json({ session_url: session.url, session_id: session.session_id });
-  } catch (error) {
-    console.error('KYC session error:', error);
-    res.status(500).json({ error: 'Ошибка' });
+    const session = await sessionResp.json() as Record<string, any>;
+    // Didit может возвращать url или session_url в зависимости от версии API
+    const sessionUrl = session.url || session.session_url;
+    const sessionId = session.session_id || session.id;
+
+    if (!sessionUrl) {
+      console.error('Didit session response missing url:', session);
+      res.status(502).json({ error: 'Didit не вернул ссылку на верификацию' });
+      return;
+    }
+
+    res.json({ session_url: sessionUrl, session_id: sessionId });
+  } catch (error: any) {
+    console.error('KYC session error:', error?.message || error);
+    res.status(500).json({ error: error?.message || 'Внутренняя ошибка KYC' });
   }
 });
 
