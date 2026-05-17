@@ -5,7 +5,6 @@ import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
 import type { UserCharacter } from '../types'
 import Button from '../components/ui/Button.vue'
-import Modal  from '../components/ui/Modal.vue'
 import CharacterPickerModal from '../components/CharacterPickerModal.vue'
 import CharacterEditorModal from '../components/CharacterEditorModal.vue'
 
@@ -169,24 +168,6 @@ function formatContent(raw: string) {
   out = out.replace(/\*([^*\n]+)\*/g, '<em class="msg-action">$1</em>')
   out = out.replace(/\n/g, '<br>')
   return out
-}
-
-// ── Modes ──────────────────────────────────────────────────────────────────
-async function setMode(modeId: string) {
-  if (modes.find(m => m.id === modeId)?.restricted && !auth.canNsfw) {
-    showModes.value = true; return
-  }
-  try {
-    await auth.updateSettings({ behavior_mode: modeId })
-    nsfwGeoBlocked.value = false; modeError.value = ''
-    showModes.value = false
-  } catch (e: any) {
-    const msg: string = e.message || ''
-    if (msg.includes('регион') || msg.includes('geo') || msg.includes('region'))
-      nsfwGeoBlocked.value = true
-    modeError.value = msg || 'Ошибка'
-    setTimeout(() => { modeError.value = ''; nsfwGeoBlocked.value = false }, 4000)
-  }
 }
 
 // ── Character switch ────────────────────────────────────────────────────────
