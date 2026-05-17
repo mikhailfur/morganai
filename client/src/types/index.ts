@@ -9,6 +9,7 @@ export interface User {
   avatar_url?: string;
   total_messages?: number;
   voice_count_today?: number;
+  daily_messages_count?: number;
   created_at?: number;
   kyc_verified?: boolean;
   subscription_type?: 'free' | 'premium' | 'premium_plus';
