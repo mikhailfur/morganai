@@ -96,6 +96,7 @@ kycProtectedRouter.post('/verify-return', async (req: any, res: Response) => {
 
     // Гео-блокировка по стране документа
     if (decision.geoBlocked) {
+      database.logSystemEvent('kyc_geo_blocked', userId, { nationality: decision.nationality, method: 'callback' }).catch(() => {});
       res.status(403).json({
         error: 'KYC верификация недоступна в вашем регионе',
         geo_blocked: true,
@@ -110,6 +111,7 @@ kycProtectedRouter.post('/verify-return', async (req: any, res: Response) => {
     }
 
     await database.setUserKycVerified(userId);
+    database.logSystemEvent('kyc_verified', userId, { method: 'callback', nationality: decision.nationality }).catch(() => {});
     res.json({ verified: true });
   } catch (error: any) {
     console.error('KYC verify-return error:', error?.message || error);
@@ -149,6 +151,7 @@ kycWebhookRouter.post('/', async (req: Request, res: Response) => {
         const decision = await fetchSessionDecision(session_id);
         if (decision.geoBlocked) {
           console.log(`KYC webhook: user ${userId} geo-blocked (${decision.nationality}), skipping kyc_verified`);
+          database.logSystemEvent('kyc_geo_blocked', userId, { nationality: decision.nationality, method: 'webhook' }).catch(() => {});
           res.json({ received: true });
           return;
         }
@@ -158,6 +161,7 @@ kycWebhookRouter.post('/', async (req: Request, res: Response) => {
     }
 
     await database.setUserKycVerified(userId);
+    database.logSystemEvent('kyc_verified', userId, { method: 'webhook' }).catch(() => {});
     console.log(`KYC verified for user ${userId} via webhook`);
     res.json({ received: true });
   } catch (error: any) {

@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { database } from '../database';
+import { config } from '../config';
 
 const router = Router();
 
@@ -104,11 +105,40 @@ router.put('/plan-limits', async (req: any, res: Response) => {
 // Event log
 router.get('/events', async (req: any, res: Response) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
+    const limit = parseInt(req.query.limit as string) || 100;
     const events = await database.getAdminEvents(limit);
     res.json({ events });
   } catch (error) {
     res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// Finance — OpenRouter balance + platform stats
+router.get('/finance', async (_req: any, res: Response) => {
+  try {
+    const [orResp, stats] = await Promise.all([
+      fetch('https://openrouter.ai/api/v1/auth/key', {
+        headers: { 'Authorization': `Bearer ${config.openrouterApiKey}` },
+      }),
+      database.getUsersStats(),
+    ]);
+
+    let openrouter: Record<string, any> | null = null;
+    if (orResp.ok) {
+      const orData = await orResp.json() as { data: Record<string, any> };
+      openrouter = orData.data;
+    } else {
+      const errText = await orResp.text();
+      openrouter = { error: `OpenRouter ${orResp.status}: ${errText}` };
+    }
+
+    res.json({
+      openrouter,
+      model: config.openrouterModel,
+      platform: stats,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Ошибка' });
   }
 });
 

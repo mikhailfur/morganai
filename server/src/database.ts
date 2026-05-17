@@ -394,6 +394,14 @@ class Database {
     );
   }
 
+  // Системное событие (не от администратора) — admin_id = 0 (LEFT JOIN вернёт NULL для email)
+  async logSystemEvent(action: string, targetUserId?: number, details?: object): Promise<void> {
+    await this.pool.execute(
+      'INSERT INTO admin_events (admin_id, target_user_id, action, details, created_at) VALUES (?, ?, ?, ?, ?)',
+      [0, targetUserId ?? null, action, details ? JSON.stringify(details) : null, Date.now()]
+    );
+  }
+
   async getAdminEvents(limit: number = 50): Promise<any[]> {
     const safeLimit = Math.min(limit, 200);
     const [rows] = await this.pool.execute(

@@ -4,17 +4,24 @@ import { useThemeStore } from '../stores/theme'
 
 const theme = useThemeStore()
 
-const activeTab = ref<'overview' | 'users' | 'subscriptions' | 'limits' | 'events'>('overview')
+const activeTab = ref<'overview' | 'users' | 'subscriptions' | 'limits' | 'events' | 'finance'>('overview')
 
 interface AdminStats { total_users: number; premium_users: number; active_users: number; total_messages: number }
 interface AdminUser { id: number; email: string; username: string; is_premium: boolean; is_admin: boolean; is_banned: boolean; subscription_type: string; subscription_expires_at: number | null; total_messages: number; last_active: number }
 interface PlanLimit { plan_type: string; daily_message_limit: number; context_messages: number; context_chars: number; voice_limit: number; voice_window_hours: number }
-interface AdminEvent { id: number; admin_email: string; target_email: string | null; action: string; details: any; created_at: number }
+interface AdminEvent { id: number; admin_id: number; admin_email: string | null; target_email: string | null; action: string; details: any; created_at: number }
+interface FinanceData {
+  openrouter: { label?: string; usage?: number; limit?: number | null; is_free_tier?: boolean; rate_limit?: { requests: number; interval: string }; error?: string } | null
+  model: string
+  platform: { total_users: number; premium_users: number; active_users: number; total_messages: number }
+}
 
 const stats = ref<AdminStats>({ total_users: 0, premium_users: 0, active_users: 0, total_messages: 0 })
 const users = ref<AdminUser[]>([])
 const planLimits = ref<Record<string, PlanLimit>>({})
 const events = ref<AdminEvent[]>([])
+const finance = ref<FinanceData | null>(null)
+const financeLoading = ref(false)
 const loading = ref(true)
 const filter = ref('все')
 
@@ -40,14 +47,43 @@ async function loadLimits() {
 }
 
 async function loadEvents() {
-  const res = await apiFetch('/api/admin/events?limit=50').then(r => r.json())
+  const res = await apiFetch('/api/admin/events?limit=100').then(r => r.json())
   events.value = res.events || []
+}
+
+async function loadFinance() {
+  financeLoading.value = true
+  try {
+    const res = await apiFetch('/api/admin/finance').then(r => r.json())
+    finance.value = res
+  } finally {
+    financeLoading.value = false
+  }
 }
 
 async function switchTab(tab: typeof activeTab.value) {
   activeTab.value = tab
   if (tab === 'limits' && Object.keys(planLimits.value).length === 0) await loadLimits()
   if (tab === 'events' && events.value.length === 0) await loadEvents()
+  if (tab === 'finance' && !finance.value) await loadFinance()
+}
+
+const eventLabels: Record<string, string> = {
+  subscription_change: 'Подписка изменена',
+  premium_toggle:      'Premium переключён',
+  user_banned:         'Пользователь заблокирован',
+  user_unbanned:       'Пользователь разблокирован',
+  plan_limits_update:  'Лимиты обновлены',
+  kyc_verified:        'KYC верифицирован',
+  kyc_geo_blocked:     'KYC геоблок',
+}
+function eventLabel(action: string) { return eventLabels[action] || action }
+function eventColor(action: string) {
+  if (action.includes('ban'))         return 'var(--accent2)'
+  if (action.includes('kyc_geo'))     return 'var(--accent2)'
+  if (action.includes('kyc'))         return 'var(--accent)'
+  if (action.includes('subscription') || action.includes('premium')) return 'color-mix(in srgb, var(--accent) 80%, var(--fg))'
+  return 'var(--meta)'
 }
 
 // Users tab
@@ -161,7 +197,7 @@ const statCards = [
     <!-- Tabs -->
     <div style="display: flex; border-bottom: var(--border); background: var(--bg-alt); padding: 0 40px; overflow-x: auto;">
       <button
-        v-for="t in [['overview','Обзор'],['users','Пользователи'],['subscriptions','Подписки'],['limits','Лимиты'],['events','Лог событий']]"
+        v-for="t in [['overview','Обзор'],['users','Пользователи'],['subscriptions','Подписки'],['limits','Лимиты'],['events','Лог событий'],['finance','Финансы']]"
         :key="t[0]"
         @click="switchTab(t[0] as any)"
         class="admin-tab"
@@ -356,34 +392,138 @@ const statCards = [
 
       <!-- ── EVENTS ── -->
       <div v-if="activeTab === 'events'">
-        <div class="editorial-label" style="color: var(--fg); opacity: 0.7; margin-bottom: 16px;">
-          <span style="opacity: 0.55;">05</span>
-          ЛОГ СОБЫТИЙ
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+          <div class="editorial-label" style="color: var(--fg); opacity: 0.7;">
+            <span style="opacity: 0.55;">05</span>
+            ЛОГ СОБЫТИЙ ({{ events.length }})
+          </div>
+          <button class="act-btn" @click="loadEvents">↺ Обновить</button>
         </div>
-        <div style="border: var(--border);">
+        <div style="border: var(--border); overflow-x: auto;">
           <table style="width: 100%; border-collapse: collapse;">
             <thead>
               <tr style="background: var(--bg-alt); font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta);">
-                <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Когда</th>
-                <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Админ</th>
+                <th style="padding: 12px 16px; text-align: left; font-weight: 400; white-space: nowrap;">Когда</th>
+                <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Источник</th>
                 <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Действие</th>
-                <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Цель</th>
+                <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Пользователь</th>
                 <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Детали</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(e, i) in events" :key="e.id" :style="{ background: i % 2 ? 'var(--bg-alt)' : 'var(--bg)', borderTop: 'var(--border)' }">
-                <td style="padding: 10px 16px; font-family: var(--font-mono); font-size: 11px; white-space: nowrap;">{{ formatDate(e.created_at) }}</td>
-                <td style="padding: 10px 16px; font-size: 13px;">{{ e.admin_email }}</td>
-                <td style="padding: 10px 16px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--accent2);">{{ e.action }}</td>
+                <td style="padding: 10px 16px; font-family: var(--font-mono); font-size: 11px; white-space: nowrap; opacity: 0.7;">{{ formatDate(e.created_at) }}</td>
+                <td style="padding: 10px 16px; font-size: 12px; font-family: var(--font-mono);">
+                  <span v-if="!e.admin_email || e.admin_id === 0" style="opacity: 0.5; font-size: 10px; letter-spacing: 1px; text-transform: uppercase;">Система</span>
+                  <span v-else>{{ e.admin_email }}</span>
+                </td>
+                <td style="padding: 10px 16px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.8px; text-transform: uppercase; white-space: nowrap;" :style="{ color: eventColor(e.action) }">{{ eventLabel(e.action) }}</td>
                 <td style="padding: 10px 16px; font-size: 13px; opacity: 0.7;">{{ e.target_email || '—' }}</td>
-                <td style="padding: 10px 16px; font-family: var(--font-mono); font-size: 11px; opacity: 0.6;">{{ e.details ? JSON.stringify(e.details) : '—' }}</td>
+                <td style="padding: 10px 16px; font-family: var(--font-mono); font-size: 10px; opacity: 0.55; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ e.details ? JSON.stringify(e.details) : '—' }}</td>
               </tr>
               <tr v-if="events.length === 0">
                 <td colspan="5" style="padding: 32px; text-align: center; font-family: var(--font-display); font-style: italic; opacity: 0.5;">Нет событий</td>
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- ── FINANCE ── -->
+      <div v-if="activeTab === 'finance'">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 8px;">
+          <div class="editorial-label" style="color: var(--fg); opacity: 0.7;">
+            <span style="opacity: 0.55;">06</span>
+            ФИНАНСЫ И БАЛАНС
+          </div>
+          <button class="act-btn" @click="loadFinance">↺ Обновить</button>
+        </div>
+
+        <div v-if="financeLoading" style="padding: 40px; text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg); opacity: 0.5; border: var(--border);">Загрузка...</div>
+
+        <div v-else-if="finance">
+
+          <!-- OpenRouter block -->
+          <div style="border: var(--border); margin-bottom: 16px;">
+            <div style="padding: 14px 20px; background: var(--bg-alt); border-bottom: var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta);">OpenRouter API</div>
+              <div style="font-family: var(--font-mono); font-size: 11px; opacity: 0.6;">{{ finance.model }}</div>
+            </div>
+
+            <div v-if="finance.openrouter?.error" style="padding: 20px; color: var(--accent2); font-family: var(--font-mono); font-size: 12px;">
+              ✖ {{ finance.openrouter.error }}
+            </div>
+            <div v-else style="padding: 0;">
+              <!-- Big numbers -->
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;">
+                <div style="padding: 20px 24px; border-right: var(--border);">
+                  <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta); margin-bottom: 8px;">Потрачено</div>
+                  <div style="font-family: var(--font-display); font-weight: 200; font-size: 36px; color: var(--accent2); letter-spacing: -1px; line-height: 1;">
+                    ${{ (finance.openrouter?.usage ?? 0).toFixed(4) }}
+                  </div>
+                </div>
+                <div style="padding: 20px 24px; border-right: var(--border);">
+                  <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta); margin-bottom: 8px;">Лимит</div>
+                  <div style="font-family: var(--font-display); font-weight: 200; font-size: 36px; color: var(--fg); letter-spacing: -1px; line-height: 1;">
+                    {{ finance.openrouter?.limit != null ? '$' + Number(finance.openrouter.limit).toFixed(2) : '∞' }}
+                  </div>
+                </div>
+                <div style="padding: 20px 24px;">
+                  <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta); margin-bottom: 8px;">Осталось</div>
+                  <div style="font-family: var(--font-display); font-weight: 200; font-size: 36px; letter-spacing: -1px; line-height: 1;" :style="{ color: finance.openrouter?.limit != null ? 'var(--accent)' : 'var(--meta)' }">
+                    {{ finance.openrouter?.limit != null ? '$' + (Number(finance.openrouter.limit) - (finance.openrouter?.usage ?? 0)).toFixed(4) : '—' }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Progress bar -->
+              <div v-if="finance.openrouter?.limit != null" style="padding: 16px 24px; border-top: var(--border);">
+                <div style="height: 6px; background: var(--rule); position: relative;">
+                  <div :style="{
+                    height: '100%',
+                    width: Math.min((finance.openrouter?.usage ?? 0) / Number(finance.openrouter.limit) * 100, 100) + '%',
+                    background: 'var(--accent2)',
+                    transition: 'width 0.4s',
+                  }"></div>
+                </div>
+                <div style="margin-top: 6px; font-family: var(--font-mono); font-size: 10px; opacity: 0.5; letter-spacing: 1px;">
+                  {{ ((finance.openrouter?.usage ?? 0) / Number(finance.openrouter.limit) * 100).toFixed(2) }}% лимита использовано
+                </div>
+              </div>
+
+              <!-- Meta row -->
+              <div style="display: flex; gap: 24px; padding: 14px 24px; border-top: var(--border); background: var(--bg-alt); flex-wrap: wrap;">
+                <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; opacity: 0.6;">
+                  Free tier: <span :style="{ color: finance.openrouter?.is_free_tier ? 'var(--accent)' : 'var(--fg)' }">{{ finance.openrouter?.is_free_tier ? 'Да' : 'Нет' }}</span>
+                </div>
+                <div v-if="finance.openrouter?.rate_limit" style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; opacity: 0.6;">
+                  Rate limit: {{ finance.openrouter.rate_limit.requests }} req / {{ finance.openrouter.rate_limit.interval }}
+                </div>
+                <div v-if="finance.openrouter?.label" style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; opacity: 0.6;">
+                  Ключ: {{ finance.openrouter.label }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Platform stats -->
+          <div style="border: var(--border);">
+            <div style="padding: 14px 20px; background: var(--bg-alt); border-bottom: var(--border);">
+              <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta);">Статистика платформы</div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;">
+              <div v-for="(item, i) in [
+                { label: 'Всего юзеров', value: finance.platform.total_users },
+                { label: 'Premium', value: finance.platform.premium_users },
+                { label: 'Активных 24ч', value: finance.platform.active_users },
+                { label: 'Сообщений', value: finance.platform.total_messages.toLocaleString() },
+              ]" :key="item.label" style="padding: 20px 24px;" :style="{ borderLeft: i > 0 ? 'var(--border)' : 'none' }">
+                <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta); margin-bottom: 8px;">{{ item.label }}</div>
+                <div style="font-family: var(--font-display); font-weight: 200; font-size: 32px; color: var(--fg); letter-spacing: -1px; line-height: 1;">{{ item.value }}</div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
