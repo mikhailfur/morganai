@@ -511,13 +511,6 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
           </div>
         </div>
 
-        <!-- AI model badge -->
-        <div class="hidden sm:flex items-center gap-1.5 rounded-full border border-violet-500/20
-                    bg-violet-500/5 px-2.5 py-1 shrink-0">
-          <div class="size-1.5 rounded-full bg-violet-400 animate-pulse" />
-          <span class="text-[10px] font-mono tracking-wider text-violet-400">DeepSeek v4</span>
-        </div>
-
         <!-- Mode button -->
         <button
           @click="showModes = true"

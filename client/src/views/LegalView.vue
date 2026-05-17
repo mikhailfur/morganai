@@ -3,317 +3,128 @@ import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { legalDocs } from '../legal/index'
 
-const route = useRoute()
-const docs = legalDocs
+const route       = useRoute()
+const docs        = legalDocs
 const activeDocId = ref((route.params.doc as string) || 'privacy')
-const activeDoc = computed(() => docs.find(d => d.id === activeDocId.value) || docs[0])
+const activeDoc   = computed(() => docs.find(d => d.id === activeDocId.value) || docs[0])
 </script>
 
 <template>
-  <div class="legal-root">
+  <div class="min-h-screen bg-[var(--bg)] text-[var(--fg)] relative z-10">
 
     <!-- Header -->
-    <header class="legal-header">
-      <router-link to="/" class="legal-logo">
-        <div class="logo-box">M</div>
-        <span class="logo-text">Morgan AI</span>
+    <header class="sticky top-0 z-50 flex items-center justify-between
+                   h-14 px-6 md:px-12
+                   border-b border-[var(--border)]
+                   bg-[#090514]/80 backdrop-blur-md">
+      <router-link to="/" class="flex items-center gap-2.5 no-underline">
+        <div class="flex size-8 items-center justify-center rounded-[8px]
+                    bg-gradient-to-br from-violet-600 to-indigo-600
+                    text-white font-bold text-sm">M</div>
+        <span class="font-semibold text-[var(--fg)] text-[15px]">Morgan AI</span>
       </router-link>
-      <div class="header-links">
-        <router-link to="/" class="header-link">Главная</router-link>
-        <span class="header-link active">Правовые документы</span>
-        <a href="mailto:support@morgan.ai" class="header-link">Поддержка</a>
+      <div class="flex items-center gap-6">
+        <router-link to="/" class="text-[13px] text-[var(--fg-muted)] hover:text-[var(--fg)] no-underline transition-colors">
+          Главная
+        </router-link>
+        <a href="mailto:support@morgan.ai" class="text-[13px] text-[var(--fg-muted)] hover:text-[var(--fg)] no-underline transition-colors">
+          Поддержка
+        </a>
       </div>
     </header>
 
-    <!-- Content -->
-    <div class="legal-body">
+    <!-- Body -->
+    <div class="max-w-[1200px] mx-auto px-6 md:px-12 py-8">
 
-      <!-- Sidebar TOC -->
-      <nav class="legal-toc">
-        <div class="toc-label">Документы</div>
-        <div class="toc-list">
-          <button
-            v-for="d in docs" :key="d.id"
-            @click="activeDocId = d.id"
-            :class="['toc-item', activeDocId === d.id ? 'active' : '']"
-          >
-            <span class="toc-num">{{ d.num }}</span>
-            <div>
-              <div class="toc-name">{{ d.name }}</div>
-              <div class="toc-ver">{{ d.version }}</div>
-            </div>
-          </button>
-        </div>
-      </nav>
-
-      <!-- Document content -->
-      <div class="legal-content">
-        <div class="doc-label">{{ activeDoc.num }} — Документ</div>
-        <h1 class="doc-heading">{{ activeDoc.heading }}</h1>
-        <div class="doc-version">Обновлено {{ activeDoc.version }}</div>
-        <div class="doc-divider"></div>
-
-        <p class="doc-intro">
-          Привет. Это не типичный документ. Мы — Morgan AI — стараемся писать понятно.
-          <span class="doc-highlight">Коротко:</span>
-          {{ activeDoc.summary }}
-        </p>
-
-        <div v-for="s in activeDoc.sections" :key="s.sym" class="doc-section">
-          <div class="section-title">{{ s.sym }} — {{ s.title }}</div>
-          <p class="section-text">{{ s.text }}</p>
-        </div>
+      <!-- Mobile: horizontal doc picker -->
+      <div class="flex gap-2 overflow-x-auto pb-3 mb-6 md:hidden" style="scrollbar-width:none">
+        <button
+          v-for="d in docs" :key="d.id"
+          @click="activeDocId = d.id"
+          class="shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-mono tracking-wider uppercase
+                 border transition-all duration-150 whitespace-nowrap"
+          :class="activeDocId === d.id
+            ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
+            : 'border-[var(--border)] text-[var(--fg-subtle)] hover:text-[var(--fg)]'"
+        >
+          {{ d.name }}
+        </button>
       </div>
 
-      <!-- Right rail -->
-      <aside class="legal-aside">
-        <div class="aside-card">
-          <div class="aside-label">Кратко</div>
-          <p class="aside-text">{{ activeDoc.summary }}</p>
-        </div>
-        <div class="aside-divider"></div>
-        <div class="aside-contact-label">Вопросы?</div>
-        <a href="mailto:privacy@morgan.ai" class="aside-email">privacy@morgan.ai</a>
-      </aside>
+      <div class="md:grid md:grid-cols-[240px_1fr_200px] md:gap-10">
 
+        <!-- TOC Sidebar (desktop) -->
+        <nav class="hidden md:block">
+          <div class="font-mono text-[10px] tracking-[0.14em] uppercase text-[var(--fg-subtle)] mb-3">
+            Документы
+          </div>
+          <div class="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] overflow-hidden">
+            <button
+              v-for="d in docs" :key="d.id"
+              @click="activeDocId = d.id"
+              class="flex items-start gap-2.5 w-full px-3.5 py-3 text-left
+                     border-0 border-t border-[var(--border)] cursor-pointer
+                     transition-all duration-150 first:border-t-0"
+              :class="activeDocId === d.id
+                ? 'bg-violet-500/12 text-[var(--accent-soft)]'
+                : 'bg-transparent text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]'"
+            >
+              <span class="font-mono text-[10px] tracking-[0.1em] opacity-60 mt-0.5 shrink-0">{{ d.num }}</span>
+              <div>
+                <div class="text-[13px] font-medium leading-[1.3]">{{ d.name }}</div>
+                <div class="font-mono text-[9px] tracking-[0.08em] uppercase opacity-50 mt-0.5">{{ d.version }}</div>
+              </div>
+            </button>
+          </div>
+        </nav>
+
+        <!-- Document content -->
+        <div class="max-w-[620px]">
+          <div class="font-mono text-[10px] tracking-[0.14em] uppercase text-[var(--fg-subtle)] mb-3">
+            {{ activeDoc.num }} — Документ
+          </div>
+          <h1 class="font-bold text-[clamp(28px,4vw,48px)] tracking-[-0.03em] text-[var(--fg)] mb-2 leading-tight">
+            {{ activeDoc.heading }}
+          </h1>
+          <div class="font-mono text-[10px] tracking-[0.12em] uppercase text-[var(--fg-subtle)]">
+            Обновлено {{ activeDoc.version }}
+          </div>
+          <div class="h-px bg-[var(--border)] my-5"></div>
+
+          <p class="text-[15px] leading-[1.7] text-[var(--fg-muted)] mb-8">
+            Привет. Это не типичный документ. Мы — Morgan AI — стараемся писать понятно.
+            <span class="bg-violet-500/20 text-[var(--accent-soft)] px-1.5 py-px rounded-[4px] font-medium">Коротко:</span>
+            {{ activeDoc.summary }}
+          </p>
+
+          <div v-for="s in activeDoc.sections" :key="s.sym" class="mt-7">
+            <h2 class="font-semibold text-[18px] tracking-[-0.01em] text-[var(--accent-soft)] mb-2.5">
+              {{ s.sym }} — {{ s.title }}
+            </h2>
+            <p class="text-[15px] leading-[1.65] text-zinc-300">{{ s.text }}</p>
+          </div>
+        </div>
+
+        <!-- Right aside (desktop) -->
+        <aside class="hidden md:block">
+          <div class="bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-4 mb-5">
+            <div class="font-mono text-[10px] tracking-[0.14em] uppercase text-[var(--accent-soft)] font-bold mb-2">
+              Кратко
+            </div>
+            <p class="text-[13px] leading-[1.5] text-[var(--fg-muted)] italic">
+              {{ activeDoc.summary }}
+            </p>
+          </div>
+          <div class="h-px bg-[var(--border)] mb-4"></div>
+          <div class="font-mono text-[10px] tracking-[0.12em] uppercase text-[var(--fg-subtle)] mb-1.5">
+            Вопросы?
+          </div>
+          <a href="mailto:privacy@morgan.ai"
+             class="text-[14px] text-[var(--accent-soft)] underline underline-offset-2">
+            privacy@morgan.ai
+          </a>
+        </aside>
+      </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.legal-root {
-  min-height: 100vh;
-  background: var(--bg);
-  color: var(--fg);
-  position: relative;
-  z-index: 1;
-}
-
-/* Header */
-.legal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 48px;
-  height: 56px;
-  border-bottom: 1px solid var(--border);
-  background: rgb(9 5 20 / 0.8);
-  backdrop-filter: blur(12px);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-.legal-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-decoration: none;
-}
-.logo-box {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #7c3aed, #6366f1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 14px;
-  color: #fff;
-}
-.logo-text {
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--fg);
-}
-.header-links {
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.header-link {
-  font-size: 13px;
-  color: var(--fg-muted);
-  text-decoration: none;
-  transition: color 0.2s;
-}
-.header-link:hover { color: var(--fg); }
-.header-link.active { color: var(--accent-soft); font-weight: 500; }
-
-/* Layout */
-.legal-body {
-  display: grid;
-  grid-template-columns: 240px 1fr 200px;
-  gap: 40px;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 32px 48px;
-}
-
-/* TOC Sidebar */
-.toc-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-  margin-bottom: 12px;
-}
-.toc-list {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-.toc-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  background: none;
-  border: none;
-  border-top: 1px solid var(--border);
-  color: var(--fg-muted);
-  cursor: pointer;
-  text-align: left;
-  width: 100%;
-  transition: background 0.15s, color 0.15s;
-}
-.toc-item:first-child { border-top: none; }
-.toc-item:hover { background: var(--surface-2); color: var(--fg); }
-.toc-item.active {
-  background: rgb(124 58 237 / 0.12);
-  color: var(--accent-soft);
-}
-.toc-num {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  opacity: 0.6;
-  margin-top: 2px;
-  flex-shrink: 0;
-}
-.toc-name {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.3;
-}
-.toc-ver {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.5;
-  margin-top: 3px;
-}
-
-/* Document content */
-.legal-content { max-width: 620px; }
-.doc-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-  margin-bottom: 12px;
-}
-.doc-heading {
-  font-family: var(--font-ui);
-  font-weight: 700;
-  font-size: clamp(28px, 4vw, 48px);
-  letter-spacing: -0.03em;
-  color: var(--fg);
-  margin: 0 0 8px;
-  white-space: pre-line;
-}
-.doc-version {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-}
-.doc-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 18px 0 24px;
-}
-.doc-intro {
-  font-size: 15px;
-  line-height: 1.7;
-  color: var(--fg-muted);
-}
-.doc-highlight {
-  background: rgb(124 58 237 / 0.2);
-  color: var(--accent-soft);
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
-  font-weight: 500;
-}
-.doc-section { margin-top: 28px; }
-.section-title {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 18px;
-  letter-spacing: -0.01em;
-  color: var(--accent-soft);
-  margin-bottom: 10px;
-}
-.section-text {
-  font-size: 15px;
-  line-height: 1.65;
-  color: var(--fg-muted);
-}
-
-/* Aside */
-.aside-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 16px;
-}
-.aside-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--accent-soft);
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-.aside-text {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--fg-muted);
-  font-style: italic;
-}
-.aside-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 20px 0 16px;
-}
-.aside-contact-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-  margin-bottom: 6px;
-}
-.aside-email {
-  display: block;
-  font-size: 14px;
-  color: var(--accent-soft);
-  text-decoration: underline;
-}
-
-@media (max-width: 900px) {
-  .legal-header { padding: 0 16px; }
-  .legal-body {
-    grid-template-columns: 1fr;
-    padding: 20px 16px;
-    gap: 24px;
-  }
-}
-</style>
