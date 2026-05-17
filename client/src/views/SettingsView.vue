@@ -47,6 +47,7 @@ async function setMode(mode: string) {
 const showKyc = ref(false)
 const kycLoading = ref(false)
 const kycError = ref('')
+const kycSuccess = ref(false)
 
 async function startKycVerification() {
   kycLoading.value = true
@@ -59,6 +60,8 @@ async function startKycVerification() {
       return
     }
     if (result.session_url) {
+      // Сохраняем session_id, чтобы проверить результат при возврате
+      if (result.session_id) sessionStorage.setItem('kyc_session_id', result.session_id)
       window.open(result.session_url, '_blank', 'noopener,noreferrer')
       showKyc.value = false
     }
@@ -69,11 +72,40 @@ async function startKycVerification() {
   }
 }
 
-// После возврата с Didit (?kyc=done) — перезагружаем пользователя
+// После возврата с Didit (?kyc=done) — проверяем результат через API, не через редирект
 onMounted(async () => {
-  if (route.query.kyc === 'done') {
+  if (route.query.kyc !== 'done') return
+
+  // Didit добавляет verificationSessionId в callback URL
+  const sessionIdFromUrl = route.query.verificationSessionId as string | undefined
+  const sessionIdFromStorage = sessionStorage.getItem('kyc_session_id') || undefined
+  const sessionId = sessionIdFromUrl || sessionIdFromStorage
+
+  router.replace({ query: {} })
+  sessionStorage.removeItem('kyc_session_id')
+
+  if (sessionId) {
+    kycLoading.value = true
+    kycError.value = ''
+    try {
+      const result = await auth.verifyKycReturn(sessionId)
+      if (result.verified) {
+        kycSuccess.value = true
+      } else if (result.geo_blocked) {
+        kycError.value = 'KYC верификация недоступна в вашем регионе'
+      } else {
+        // Статус ещё не Approved (In Review, In Progress) — перезагрузим пользователя
+        await auth.fetchUser()
+      }
+    } catch (e: any) {
+      // Если API недоступен, просто перезагружаем пользователя (webhook мог уже отработать)
+      await auth.fetchUser()
+    } finally {
+      kycLoading.value = false
+    }
+  } else {
+    // session_id неизвестен — полагаемся на webhook
     await auth.fetchUser()
-    router.replace({ query: {} })
   }
 })
 
@@ -202,8 +234,18 @@ async function submitDelete() {
         <div v-if="nsfwGeoBlocked" style="margin-top: 12px; font-family: var(--font-mono); font-size: 10px; color: var(--accent2); letter-spacing: 1.2px; text-transform: uppercase;">
           ✖ NSFW недоступен в вашем регионе
         </div>
+        <!-- KYC loading indicator (after returning from Didit) -->
+        <div v-if="kycLoading" style="margin-top: 12px; font-family: var(--font-mono); font-size: 10px; opacity: 0.7; letter-spacing: 1.2px; text-transform: uppercase;">
+          ● Проверяем результат верификации...
+        </div>
+        <!-- KYC success -->
+        <div v-if="kycSuccess" style="margin-top: 12px; padding: 8px 12px; border-left: 3px solid var(--accent); font-family: var(--font-mono); font-size: 10px; color: var(--accent); letter-spacing: 1.2px; text-transform: uppercase;">
+          ✓ Возраст подтверждён — NSFW разблокирован
+        </div>
+        <!-- KYC error (geo или другое) -->
+        <div v-if="kycError && !showKyc" style="margin-top: 12px; padding: 8px 12px; border-left: 3px solid var(--accent2); font-family: var(--font-mono); font-size: 10px; color: var(--accent2); letter-spacing: 1.2px;">{{ kycError }}</div>
         <!-- KYC кнопка для не-Premium без верификации -->
-        <div v-if="!auth.isPremium && !auth.isKycVerified && !nsfwGeoBlocked" style="margin-top: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div v-if="!auth.isPremium && !auth.isKycVerified && !nsfwGeoBlocked && !kycLoading && !kycSuccess" style="margin-top: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
           <button class="btn-ghost btn-sm" @click="showKyc = true">Подтвердить возраст 18+</button>
           <span style="font-size: 12px; color: var(--fg-dim); font-family: var(--font-mono);">— разблокирует NSFW без Premium</span>
         </div>
