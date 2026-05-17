@@ -7,6 +7,7 @@ const API = '/api';
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null);
   const loading = ref(false);
+  const initialized = ref(false);
   const appConfig = ref<{ googleClientId: string | null; telegramBotId: string | null }>({
     googleClientId: null,
     telegramBotId: null,
@@ -33,7 +34,8 @@ export const useAuthStore = defineStore('auth', () => {
         return;
       }
       user.value = await res.json();
-    } catch { /* network error — don't clear authenticated state */ }
+    } catch { /* network error — preserve current state */ }
+    finally { initialized.value = true; }
   }
 
   async function register(email: string, username: string, password: string) {
@@ -171,7 +173,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    user, loading, appConfig,
+    user, loading, initialized, appConfig,
     isAuthenticated, isAdmin, isPremium, isKycVerified, canNsfw,
     fetchAppConfig, fetchUser, register, login, loginWithGoogle, loginWithTelegram, logout,
     updateSettings, verifyKyc, startKycSession, verifyKycReturn, changePassword, deleteAccount,
