@@ -2,26 +2,27 @@
 import { ref, onMounted } from 'vue'
 import { useChatStore } from '../stores/chat'
 import type { UserCharacter } from '../types'
+import Modal  from './ui/Modal.vue'
+import Button from './ui/Button.vue'
 import CharacterEditorModal from './CharacterEditorModal.vue'
 
 const props = defineProps<{
-  visible: boolean
-  currentSlug: string
+  visible:      boolean
+  currentSlug:  string
 }>()
 
 const emit = defineEmits<{
-  close: []
+  close:  []
   select: [slug: string]
 }>()
 
-const chat = useChatStore()
-
-const activeTab = ref<'canonical' | 'mine' | 'community'>('canonical')
-const showEditor = ref(false)
+const chat        = useChatStore()
+const activeTab   = ref<'canonical' | 'mine' | 'community'>('canonical')
+const showEditor  = ref(false)
 const editingChar = ref<UserCharacter | null>(null)
 
 onMounted(async () => {
-  if (chat.myCharacters.length === 0) await chat.fetchMyCharacters()
+  if (chat.myCharacters.length === 0)     await chat.fetchMyCharacters()
   if (chat.publicCharacters.length === 0) await chat.fetchPublicCharacters()
 })
 
@@ -37,269 +38,190 @@ function selectUserChar(id: number) {
 
 function openCreate() {
   editingChar.value = null
-  showEditor.value = true
+  showEditor.value  = true
 }
 
 function openEdit(char: UserCharacter) {
   editingChar.value = char
-  showEditor.value = true
+  showEditor.value  = true
 }
 
-function onEditorSaved(_char: UserCharacter) {
-  showEditor.value = false
-}
+function onEditorSaved(_char: UserCharacter) { showEditor.value = false }
 
 function onEditorDeleted(id: number) {
-  // если удалён текущий персонаж — переключиться на morgan
-  if (props.currentSlug === `uc:${id}`) {
-    emit('select', 'morgan')
-  }
+  if (props.currentSlug === `uc:${id}`) emit('select', 'morgan')
   showEditor.value = false
 }
 
+const tabs = [
+  { id: 'canonical',  label: 'Каноничные' },
+  { id: 'mine',       label: 'Мои' },
+  { id: 'community',  label: 'Сообщество' },
+] as const
 </script>
 
 <template>
-  <Teleport to="body">
-    <div v-if="visible && !showEditor" class="modal-overlay" @click.self="emit('close')">
-      <div class="modal-box" style="max-width: 640px; width: 100%; padding: 0; overflow: hidden;">
+  <!-- Picker -->
+  <Modal
+    :open="visible && !showEditor"
+    title="Персонажи"
+    size="md"
+    @update:open="val => !val && emit('close')"
+    @close="emit('close')"
+  >
+    <!-- Tab bar (inside body slot, above content) -->
+    <template #default>
+      <!-- Tabs -->
+      <div class="-mx-5 -mt-5 mb-4 flex border-b border-[var(--border)] overflow-x-auto">
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          @click="activeTab = tab.id"
+          class="shrink-0 px-4 py-3 text-xs font-mono tracking-widest uppercase transition-colors duration-150"
+          :class="activeTab === tab.id
+            ? 'text-violet-400 border-b-2 border-violet-400 -mb-px'
+            : 'text-[var(--fg-subtle)] hover:text-[var(--fg)]'"
+        >{{ tab.label }}</button>
+      </div>
 
-        <!-- Modal header -->
-        <div style="padding: 20px 24px 0; display: flex; align-items: center; justify-content: space-between;">
-          <div style="font-family: var(--font-ui); font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: var(--fg);">Персонажи</div>
-          <button @click="emit('close')" class="btn-ghost btn-sm" style="font-size: 18px; padding: 2px 8px;">✕</button>
-        </div>
-
-        <!-- Tabs -->
-        <div style="display: flex; gap: 0; padding: 16px 24px 0; border-bottom: 1px solid var(--border);">
-          <button
-            v-for="tab in [
-              { id: 'canonical', label: 'Каноничные' },
-              { id: 'mine', label: 'Мои' },
-              { id: 'community', label: 'Сообщество' },
-            ]"
-            :key="tab.id"
-            @click="activeTab = tab.id as any"
-            :style="{
-              fontFamily: 'var(--font-mono)',
-              fontSize: '10px',
-              letterSpacing: '1.4px',
-              textTransform: 'uppercase',
-              padding: '8px 16px',
-              background: 'none',
-              border: 'none',
-              borderBottom: activeTab === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
-              color: activeTab === tab.id ? 'var(--accent)' : 'var(--fg)',
-              cursor: 'pointer',
-              opacity: activeTab === tab.id ? 1 : 0.6,
-              transition: 'all 0.15s',
-              marginBottom: '-1px',
-            }"
-          >{{ tab.label }}</button>
-        </div>
-
-        <!-- Content -->
-        <div style="padding: 20px 24px; max-height: 480px; overflow-y: auto;">
-
-          <!-- Canonical tab -->
-          <div v-if="activeTab === 'canonical'">
-            <div class="char-label" style="margin-bottom: 12px;">Официальные персонажи платформы</div>
-            <div class="char-grid">
-              <button
-                v-for="c in chat.characters"
-                :key="c.slug"
-                @click="selectCanonical(c.slug)"
-                :class="['char-card', currentSlug === c.slug ? 'active' : '']"
-              >
-                <div class="char-avatar">
-                  <img v-if="c.avatar_url" :src="c.avatar_url" :alt="c.name" />
-                  <span v-else class="char-avatar-placeholder">{{ c.name[0] }}</span>
-                </div>
-                <div style="flex: 1; min-width: 0;">
-                  <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                    <span style="font-family: var(--font-display); font-weight: 600; font-size: 15px;">{{ c.name }}</span>
-                    <span v-if="c.is_premium" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-soft); letter-spacing: 1px;">✦ Premium</span>
-                    <span v-if="currentSlug === c.slug" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-soft); letter-spacing: 1px;">● активен</span>
-                  </div>
-                  <div style="font-size: 12px; color: var(--fg-muted); margin-top: 3px; line-height: 1.3;">
-                    {{ c.description?.slice(0, 80) }}{{ (c.description?.length ?? 0) > 80 ? '...' : '' }}
-                  </div>
-                </div>
-              </button>
-            </div>
+      <!-- Canonical tab -->
+      <div v-if="activeTab === 'canonical'" class="flex flex-col gap-2">
+        <p class="text-xs text-[var(--fg-subtle)] font-mono tracking-wider uppercase mb-1">
+          Официальные персонажи платформы
+        </p>
+        <button
+          v-for="c in chat.characters"
+          :key="c.slug"
+          @click="selectCanonical(c.slug)"
+          class="flex items-center gap-3 p-3 w-full text-left rounded-[10px] border transition-all duration-150"
+          :class="currentSlug === c.slug
+            ? 'border-violet-500/40 bg-violet-500/10'
+            : 'border-[var(--border)] hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)]'"
+        >
+          <div class="size-10 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600
+                      flex items-center justify-center shrink-0 text-white font-bold text-sm">
+            <img v-if="c.avatar_url" :src="c.avatar_url" :alt="c.name"
+                 class="size-full rounded-full object-cover" />
+            <span v-else>{{ c.name[0] }}</span>
           </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-sm font-semibold text-[var(--fg)]">{{ c.name }}</span>
+              <span v-if="c.is_premium"
+                    class="text-[10px] font-mono tracking-wider text-violet-400">✦ Premium</span>
+              <span v-if="currentSlug === c.slug"
+                    class="text-[10px] font-mono tracking-wider text-violet-400">● активен</span>
+            </div>
+            <p class="text-xs text-[var(--fg-muted)] mt-0.5 line-clamp-1">
+              {{ c.description?.slice(0, 80) }}{{ (c.description?.length ?? 0) > 80 ? '…' : '' }}
+            </p>
+          </div>
+        </button>
+      </div>
 
-          <!-- Mine tab -->
-          <div v-else-if="activeTab === 'mine'">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-              <div class="char-label">Ваши персонажи</div>
-              <button class="btn-primary btn-sm" @click="openCreate">+ Создать</button>
-            </div>
-            <div v-if="chat.myCharacters.length === 0" style="text-align: center; padding: 32px 0; font-size: 14px; color: var(--fg-muted);">
-              Создайте своего первого персонажа
-            </div>
-            <div v-else class="char-grid">
-              <div
-                v-for="c in chat.myCharacters"
-                :key="c.id"
-                class="char-card"
-                :class="{ active: currentSlug === `uc:${c.id}` }"
-                style="cursor: default;"
-              >
-                <div class="char-avatar" @click="selectUserChar(c.id)" style="cursor: pointer;">
-                  <img v-if="c.avatar_url" :src="c.avatar_url" :alt="c.name" />
-                  <span v-else class="char-avatar-placeholder">{{ c.name[0] }}</span>
-                </div>
-                <div style="flex: 1; min-width: 0; cursor: pointer;" @click="selectUserChar(c.id)">
-                  <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                    <span style="font-weight: 600; font-size: 15px; color: var(--fg);">{{ c.name }}</span>
-                    <span v-if="c.is_public" style="font-family: var(--font-mono); font-size: 9px; color: var(--fg-subtle); letter-spacing: 1px;">◎ публичный</span>
-                    <span v-if="currentSlug === `uc:${c.id}`" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-soft); letter-spacing: 1px;">● активен</span>
-                  </div>
-                  <div style="font-size: 12px; color: var(--fg-muted); margin-top: 3px; line-height: 1.3;">
-                    {{ c.description?.slice(0, 80) }}{{ (c.description?.length ?? 0) > 80 ? '...' : '' }}
-                  </div>
-                </div>
-                <button
-                  @click.stop="openEdit(c)"
-                  class="btn-ghost btn-sm"
-                  style="font-size: 12px; padding: 4px 8px; flex-shrink: 0;"
-                  title="Редактировать"
-                >✎</button>
+      <!-- Mine tab -->
+      <div v-else-if="activeTab === 'mine'" class="flex flex-col gap-2">
+        <div class="flex items-center justify-between mb-1">
+          <p class="text-xs text-[var(--fg-subtle)] font-mono tracking-wider uppercase">Ваши персонажи</p>
+          <Button variant="primary" size="sm" @click="openCreate">+ Создать</Button>
+        </div>
+
+        <p v-if="chat.myCharacters.length === 0"
+           class="py-8 text-center text-sm text-[var(--fg-muted)]">
+          У вас пока нет персонажей
+        </p>
+
+        <div v-else class="flex flex-col gap-2">
+          <div
+            v-for="c in chat.myCharacters"
+            :key="c.id"
+            class="flex items-center gap-3 p-3 rounded-[10px] border transition-all duration-150"
+            :class="currentSlug === `uc:${c.id}`
+              ? 'border-violet-500/40 bg-violet-500/10'
+              : 'border-[var(--border)] hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)]'"
+          >
+            <button class="size-10 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600
+                           flex items-center justify-center shrink-0 text-white font-bold text-sm"
+                    @click="selectUserChar(c.id)">
+              <img v-if="c.avatar_url" :src="c.avatar_url" :alt="c.name"
+                   class="size-full rounded-full object-cover" />
+              <span v-else>{{ c.name[0] }}</span>
+            </button>
+            <div class="flex-1 min-w-0 cursor-pointer" @click="selectUserChar(c.id)">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-sm font-semibold text-[var(--fg)]">{{ c.name }}</span>
+                <span v-if="c.is_public"
+                      class="text-[10px] font-mono tracking-wider text-[var(--fg-subtle)]">◎ публичный</span>
+                <span v-if="currentSlug === `uc:${c.id}`"
+                      class="text-[10px] font-mono tracking-wider text-violet-400">● активен</span>
               </div>
+              <p class="text-xs text-[var(--fg-muted)] mt-0.5 line-clamp-1">
+                {{ c.description?.slice(0, 80) }}{{ (c.description?.length ?? 0) > 80 ? '…' : '' }}
+              </p>
             </div>
+            <button
+              class="p-1.5 rounded-[6px] text-[var(--fg-subtle)] hover:text-[var(--fg)]
+                     hover:bg-[var(--surface-3)] transition-colors duration-150 shrink-0"
+              title="Редактировать"
+              @click.stop="openEdit(c)"
+            >
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
           </div>
-
-          <!-- Community tab -->
-          <div v-else-if="activeTab === 'community'">
-            <div class="char-label" style="margin-bottom: 12px;">Персонажи, опубликованные пользователями</div>
-            <div v-if="chat.publicCharacters.length === 0" style="text-align: center; padding: 32px 0; font-size: 14px; color: var(--fg-muted);">
-              Пока нет публичных персонажей
-            </div>
-            <div v-else class="char-grid">
-              <button
-                v-for="c in chat.publicCharacters"
-                :key="c.id"
-                @click="selectUserChar(c.id)"
-                class="char-card"
-                :class="{ active: currentSlug === `uc:${c.id}` }"
-              >
-                <div class="char-avatar">
-                  <img v-if="c.avatar_url" :src="c.avatar_url" :alt="c.name" />
-                  <span v-else class="char-avatar-placeholder">{{ c.name[0] }}</span>
-                </div>
-                <div style="flex: 1; min-width: 0;">
-                  <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                    <span style="font-weight: 600; font-size: 15px; color: var(--fg);">{{ c.name }}</span>
-                    <span v-if="currentSlug === `uc:${c.id}`" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-soft); letter-spacing: 1px;">● активен</span>
-                  </div>
-                  <div style="font-size: 12px; color: var(--fg-muted); margin-top: 3px; line-height: 1.3;">
-                    {{ c.description?.slice(0, 80) }}{{ (c.description?.length ?? 0) > 80 ? '...' : '' }}
-                  </div>
-                  <div v-if="c.author_name" style="font-family: var(--font-mono); font-size: 9px; color: var(--fg-subtle); margin-top: 4px; letter-spacing: 1px;">
-                    by {{ c.author_name }}
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-
         </div>
       </div>
-    </div>
 
-    <!-- Editor modal -->
-    <CharacterEditorModal
-      :visible="showEditor"
-      :character="editingChar"
-      @close="showEditor = false"
-      @saved="onEditorSaved"
-      @deleted="onEditorDeleted"
-    />
-  </Teleport>
+      <!-- Community tab -->
+      <div v-else-if="activeTab === 'community'" class="flex flex-col gap-2">
+        <p class="text-xs text-[var(--fg-subtle)] font-mono tracking-wider uppercase mb-1">
+          Персонажи, опубликованные пользователями
+        </p>
+        <p v-if="chat.publicCharacters.length === 0"
+           class="py-8 text-center text-sm text-[var(--fg-muted)]">
+          Пока нет публичных персонажей
+        </p>
+        <button
+          v-for="c in chat.publicCharacters"
+          :key="c.id"
+          @click="selectUserChar(c.id)"
+          class="flex items-center gap-3 p-3 w-full text-left rounded-[10px] border transition-all duration-150"
+          :class="currentSlug === `uc:${c.id}`
+            ? 'border-violet-500/40 bg-violet-500/10'
+            : 'border-[var(--border)] hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)]'"
+        >
+          <div class="size-10 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600
+                      flex items-center justify-center shrink-0 text-white font-bold text-sm">
+            <img v-if="c.avatar_url" :src="c.avatar_url" :alt="c.name"
+                 class="size-full rounded-full object-cover" />
+            <span v-else>{{ c.name[0] }}</span>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-sm font-semibold text-[var(--fg)]">{{ c.name }}</span>
+              <span v-if="currentSlug === `uc:${c.id}`"
+                    class="text-[10px] font-mono tracking-wider text-violet-400">● активен</span>
+            </div>
+            <p class="text-xs text-[var(--fg-muted)] mt-0.5 line-clamp-1">
+              {{ c.description?.slice(0, 80) }}{{ (c.description?.length ?? 0) > 80 ? '…' : '' }}
+            </p>
+            <p v-if="c.author_name" class="text-[10px] text-[var(--fg-subtle)] font-mono mt-0.5">
+              by {{ c.author_name }}
+            </p>
+          </div>
+        </button>
+      </div>
+    </template>
+  </Modal>
+
+  <!-- Editor modal (stacked) -->
+  <CharacterEditorModal
+    :visible="showEditor"
+    :character="editingChar"
+    @close="showEditor = false"
+    @saved="onEditorSaved"
+    @deleted="onEditorDeleted"
+  />
 </template>
-
-<style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 0.6);
-  backdrop-filter: blur(4px);
-  z-index: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-}
-
-.modal-box {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 0 48px -8px rgb(124 58 237 / 0.4);
-}
-
-.char-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-}
-
-.char-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.char-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 14px;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  color: var(--fg);
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s, border-color 0.12s;
-  width: 100%;
-}
-
-.char-card:hover {
-  background: var(--surface-2);
-}
-
-.char-card.active {
-  border-color: rgb(124 58 237 / 0.5);
-  background: rgb(124 58 237 / 0.1);
-}
-
-.char-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  overflow: hidden;
-  flex-shrink: 0;
-  background: linear-gradient(135deg, #7c3aed, #6366f1);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.char-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.char-avatar-placeholder {
-  font-family: var(--font-ui);
-  font-size: 18px;
-  font-weight: 700;
-  color: #fff;
-}
-</style>
