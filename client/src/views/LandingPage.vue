@@ -71,7 +71,7 @@ const plans = [
 
 onMounted(async () => {
   if (auth.isAuthenticated) { router.push('/chat'); return }
-  if (chat.characters.length === 0) await chat.fetchCharacters()
+  if (chat.characters.length === 0) await chat.fetchCharactersPublic()
 })
 
 function goToChat() {

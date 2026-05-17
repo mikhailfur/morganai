@@ -206,6 +206,19 @@ router.post('/telegram', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/auth/characters/canonical — каноничные персонажи платформы (без auth)
+router.get('/characters/canonical', async (_req, res: Response) => {
+  try {
+    const characters = await database.getCharacters();
+    res.json({ characters: characters.map((c: any) => ({
+      slug: c.slug, name: c.name, description: c.description,
+      avatar_url: c.avatar_url, is_premium: Boolean(c.is_premium),
+    })) });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
 // GET /api/auth/characters/public — публичные пользовательские персонажи (без auth)
 router.get('/characters/public', async (_req, res: Response) => {
   try {

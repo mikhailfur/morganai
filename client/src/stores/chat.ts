@@ -125,6 +125,14 @@ export const useChatStore = defineStore('chat', () => {
     } catch { /* */ }
   }
 
+  async function fetchCharactersPublic() {
+    try {
+      const res = await fetch('/api/auth/characters/canonical');
+      const data = await res.json();
+      characters.value = data.characters || [];
+    } catch { /* */ }
+  }
+
   async function fetchMyCharacters() {
     try {
       const res = await apiFetch('/api/user/characters/my');
@@ -178,7 +186,7 @@ export const useChatStore = defineStore('chat', () => {
 
   return {
     messages, characters, myCharacters, publicCharacters, isLoading, isStreaming,
-    fetchHistory, sendMessage, sendImage, clearHistory, fetchCharacters,
+    fetchHistory, sendMessage, sendImage, clearHistory, fetchCharacters, fetchCharactersPublic,
     fetchMyCharacters, fetchPublicCharacters, createUserCharacter, updateUserCharacter,
     deleteUserCharacter, togglePublishCharacter,
   };

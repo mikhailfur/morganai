@@ -4,7 +4,9 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
 import Modal from '../components/ui/Modal.vue'
+import Button from '../components/ui/Button.vue'
 import CharacterPickerModal from '../components/CharacterPickerModal.vue'
+import CharacterEditorModal from '../components/CharacterEditorModal.vue'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -14,9 +16,10 @@ const messageInput      = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const fileInput         = ref<HTMLInputElement | null>(null)
 const isRecording       = ref(false)
-const sidebarOpen       = ref(false)
-const showModes         = ref(false)
+const sidebarOpen         = ref(false)
+const showModes           = ref(false)
 const showCharacterPicker = ref(false)
+const showCreateChar      = ref(false)
 
 const currentCharacter = computed(() => auth.user?.selected_character || 'morgan')
 
@@ -63,6 +66,9 @@ const nsfwGeoBlocked = ref(false)
 const modeError      = ref('')
 
 onMounted(async () => {
+  // Reset stuck loading state when returning from other routes
+  chat.isLoading = false
+  chat.isStreaming = false
   await chat.fetchCharacters()
   await chat.fetchMyCharacters()
   await chat.fetchHistory(currentCharacter.value)
@@ -196,9 +202,10 @@ async function sendSuggestion(text: string) {
         </button>
       </div>
 
-      <!-- Section label -->
-      <div class="px-4 pb-1 pt-3 text-[9px] font-mono tracking-[0.14em] uppercase text-[var(--fg-subtle)] shrink-0">
-        Персонажи
+      <!-- Section label + create button -->
+      <div class="flex items-center justify-between px-4 pb-1 pt-3 shrink-0">
+        <span class="text-[9px] font-mono tracking-[0.14em] uppercase text-[var(--fg-subtle)]">Персонажи</span>
+        <Button variant="primary" size="sm" @click="showCreateChar = true">+ Создать</Button>
       </div>
 
       <!-- Character list -->
@@ -622,6 +629,15 @@ async function sendSuggestion(text: string) {
       :current-slug="currentCharacter"
       @close="showCharacterPicker = false"
       @select="switchCharacter"
+    />
+
+    <!-- ─── Create Character ──────────────────────────────────────── -->
+    <CharacterEditorModal
+      :visible="showCreateChar"
+      :character="null"
+      @close="showCreateChar = false"
+      @saved="showCreateChar = false"
+      @deleted="showCreateChar = false"
     />
 
   </div>

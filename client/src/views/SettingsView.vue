@@ -2,35 +2,40 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import LanguageSwitcher from '../components/LanguageSwitcher.vue'
+import Card    from '../components/ui/Card.vue'
+import Input   from '../components/ui/Input.vue'
+import Button  from '../components/ui/Button.vue'
+import Modal   from '../components/ui/Modal.vue'
 
-const auth = useAuthStore()
+const auth   = useAuthStore()
 const router = useRouter()
-const route = useRoute()
+const route  = useRoute()
 
-const modes = [
-  { id: 'default',      name: 'Обычный',   desc: 'Стандартный ролевой режим. NSFW фильтр включён.' },
-  { id: 'study',        name: 'Учёба',      desc: 'Репетитор. Помогает с заданиями и объясняет.' },
-  { id: 'work',         name: 'Работа',     desc: 'Деловой помощник. Письма, задачи, переговоры.' },
-  { id: 'psychologist', name: 'Психолог',   desc: 'Эмоциональная поддержка. Без оценок и советов.' },
-  { id: 'nsfw',         name: 'NSFW · 18+', desc: 'Без фильтра. Требуется Premium или подтверждение возраста.', restricted: true },
-]
-
-const activeTab = ref('profile')
+// ─── Tabs ─────────────────────────────────────────────────────────────────
 const tabs = [
-  { id: 'profile',  label: 'Профиль',    icon: 'user' },
-  { id: 'general',  label: 'Основные',   icon: 'settings' },
-  { id: 'billing',  label: 'Подписка',   icon: 'crown' },
-  { id: 'privacy',  label: 'Приватность',icon: 'shield' },
-  { id: 'account',  label: 'Аккаунт',    icon: 'danger', danger: true },
+  { id: 'profile',  label: 'Профиль',     icon: 'user' },
+  { id: 'general',  label: 'Основные',    icon: 'settings' },
+  { id: 'billing',  label: 'Подписка',    icon: 'crown' },
+  { id: 'privacy',  label: 'Приватность', icon: 'shield' },
+  { id: 'account',  label: 'Аккаунт',     icon: 'danger', danger: true },
 ]
+const activeTab = ref('profile')
 
-const modeError = ref('')
+// ─── Modes ────────────────────────────────────────────────────────────────
+const modes = [
+  { id: 'default',      name: 'Обычный',    desc: 'Стандартный ролевой режим.' },
+  { id: 'study',        name: 'Учёба',       desc: 'Репетитор. Помогает с заданиями.' },
+  { id: 'work',         name: 'Работа',      desc: 'Деловой помощник.' },
+  { id: 'psychologist', name: 'Психолог',    desc: 'Эмоциональная поддержка.' },
+  { id: 'nsfw',         name: 'NSFW · 18+',  desc: 'Без фильтра. Требуется Premium или верификация.', restricted: true },
+]
+const modeError      = ref('')
 const nsfwGeoBlocked = ref(false)
+
 async function setMode(mode: string) {
   const m = modes.find(m => m.id === mode)
   if (m?.restricted && !auth.canNsfw) {
-    modeError.value = 'NSFW доступен с Premium или после подтверждения возраста 18+'
+    modeError.value = 'NSFW доступен с Premium или после верификации 18+'
     setTimeout(() => modeError.value = '', 3000)
     return
   }
@@ -40,20 +45,16 @@ async function setMode(mode: string) {
     nsfwGeoBlocked.value = false
   } catch (e: any) {
     const msg: string = e.message || ''
-    if (msg.includes('регион') || msg.includes('geo')) {
-      nsfwGeoBlocked.value = true
-      modeError.value = 'NSFW недоступен в вашем регионе'
-    } else {
-      modeError.value = msg
-    }
-    setTimeout(() => modeError.value = '', 4000)
+    if (msg.includes('регион') || msg.includes('geo')) nsfwGeoBlocked.value = true
+    modeError.value = msg
+    setTimeout(() => { modeError.value = ''; nsfwGeoBlocked.value = false }, 4000)
   }
 }
 
-// KYC
-const showKyc = ref(false)
+// ─── KYC ──────────────────────────────────────────────────────────────────
+const showKyc   = ref(false)
 const kycLoading = ref(false)
-const kycError = ref('')
+const kycError   = ref('')
 const kycSuccess = ref(false)
 
 async function startKycVerification() {
@@ -72,12 +73,13 @@ async function startKycVerification() {
 
 onMounted(async () => {
   if (route.query.kyc !== 'done') return
-  const sessionIdFromUrl = route.query.verificationSessionId as string | undefined
+  const sessionIdFromUrl     = route.query.verificationSessionId as string | undefined
   const sessionIdFromStorage = sessionStorage.getItem('kyc_session_id') || undefined
   const sessionId = sessionIdFromUrl || sessionIdFromStorage
   router.replace({ query: {} })
   sessionStorage.removeItem('kyc_session_id')
   if (sessionId) {
+    activeTab.value = 'privacy'
     kycLoading.value = true; kycError.value = ''
     try {
       const result = await auth.verifyKycReturn(sessionId)
@@ -89,29 +91,35 @@ onMounted(async () => {
   } else { await auth.fetchUser() }
 })
 
-// Password change
+// ─── Password ─────────────────────────────────────────────────────────────
 const showPasswordModal = ref(false)
 const pwCurrent = ref(''); const pwNew = ref(''); const pwConfirm = ref('')
-const pwError = ref(''); const pwSuccess = ref(false); const pwLoading = ref(false)
+const pwError   = ref(''); const pwSuccess = ref(false); const pwLoading = ref(false)
 
 function openPasswordModal() {
   pwCurrent.value = ''; pwNew.value = ''; pwConfirm.value = ''
   pwError.value = ''; pwSuccess.value = false; showPasswordModal.value = true
 }
+
 async function submitPasswordChange() {
   if (!pwCurrent.value || !pwNew.value || !pwConfirm.value) { pwError.value = 'Заполните все поля'; return }
   if (pwNew.value !== pwConfirm.value) { pwError.value = 'Новые пароли не совпадают'; return }
   if (pwNew.value.length < 8) { pwError.value = 'Минимум 8 символов'; return }
   pwLoading.value = true
-  try { await auth.changePassword(pwCurrent.value, pwNew.value); pwSuccess.value = true; setTimeout(() => showPasswordModal.value = false, 1500) }
-  catch (e: any) { pwError.value = e.message }
+  try {
+    await auth.changePassword(pwCurrent.value, pwNew.value)
+    pwSuccess.value = true
+    setTimeout(() => { showPasswordModal.value = false }, 1500)
+  } catch (e: any) { pwError.value = e.message }
   finally { pwLoading.value = false }
 }
 
-// Delete account
+// ─── Delete ───────────────────────────────────────────────────────────────
 const showDeleteModal = ref(false)
-const deletePassword = ref(''); const deleteError = ref(''); const deleteLoading = ref(false)
+const deletePassword  = ref(''); const deleteError = ref(''); const deleteLoading = ref(false)
+
 function openDeleteModal() { deletePassword.value = ''; deleteError.value = ''; showDeleteModal.value = true }
+
 async function submitDelete() {
   if (!deletePassword.value) { deleteError.value = 'Введите пароль'; return }
   deleteLoading.value = true
@@ -129,591 +137,397 @@ async function clearChat() {
 </script>
 
 <template>
-  <div class="settings-root">
+  <div class="flex h-dvh bg-[#090514] text-[var(--fg)] overflow-hidden">
 
-    <!-- Sidebar -->
-    <aside class="settings-sidebar">
-      <!-- Logo -->
-      <div class="sb-brand">
-        <router-link to="/chat" class="sb-logo">
-          <div class="sb-logo-box">M</div>
-          <span class="sb-logo-text">Morgan AI</span>
+    <!-- ─── Sidebar (desktop) ───────────────────────────────────── -->
+    <aside class="hidden md:flex w-56 flex-col shrink-0 border-r border-[var(--border)] bg-[#120d24]">
+
+      <!-- Brand / back -->
+      <div class="flex h-14 items-center gap-2.5 border-b border-[var(--border)] px-4 shrink-0">
+        <router-link to="/chat" class="flex items-center gap-2.5 group">
+          <div class="flex size-8 items-center justify-center rounded-[8px]
+                      bg-gradient-to-br from-violet-600 to-indigo-600
+                      text-white text-sm font-bold">M</div>
+          <span class="text-sm font-semibold text-[var(--fg-muted)] group-hover:text-[var(--fg)]
+                       transition-colors duration-150">← В чат</span>
         </router-link>
       </div>
 
       <!-- Tabs -->
-      <nav class="sb-nav">
+      <nav class="flex-1 overflow-y-auto p-2 space-y-0.5">
         <button
           v-for="t in tabs" :key="t.id"
           @click="activeTab = t.id"
-          :class="['sb-tab', activeTab === t.id ? 'active' : '', t.danger ? 'danger' : '']"
+          class="flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 text-sm
+                 transition-all duration-150 border"
+          :class="[
+            activeTab === t.id
+              ? (t.danger ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-violet-500/15 border-violet-500/30 text-violet-200')
+              : (t.danger ? 'border-transparent text-red-400/70 hover:bg-red-500/5 hover:border-red-500/20' : 'border-transparent text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]'),
+          ]"
         >{{ t.label }}</button>
       </nav>
-
-      <!-- Back to chat -->
-      <div class="sb-footer">
-        <router-link to="/chat" class="btn-ghost btn-sm" style="text-decoration: none; width: 100%;">← В чат</router-link>
-      </div>
     </aside>
 
-    <!-- Main -->
-    <div class="settings-main">
+    <!-- ─── Main content ────────────────────────────────────────── -->
+    <div class="flex flex-1 flex-col min-w-0 overflow-hidden">
 
-      <!-- Profile tab -->
-      <div v-if="activeTab === 'profile'" class="tab-content animate-fade-in">
-        <h2 class="tab-heading">Профиль</h2>
-        <div class="settings-card">
-          <div class="settings-row">
-            <div class="row-label">Имя</div>
-            <div class="row-value">{{ auth.user?.username }}</div>
-          </div>
-          <div class="settings-row">
-            <div class="row-label">Email</div>
-            <div class="row-value">{{ auth.user?.email }}</div>
-          </div>
-          <div class="settings-row">
-            <div class="row-label">Тариф</div>
-            <div class="row-value" :style="{ color: auth.isPremium ? 'var(--accent-soft)' : 'var(--fg-muted)' }">
-              {{ auth.user?.subscription_type === 'premium_plus' ? '✦ Premium+' : auth.isPremium ? '✦ Premium' : 'Free' }}
-            </div>
-          </div>
-          <div class="settings-row" style="border-bottom: none;">
-            <div class="row-label">Сообщений всего</div>
-            <div class="row-value">{{ auth.user?.total_messages || 0 }}</div>
-          </div>
-        </div>
-
-        <!-- Voice stats -->
-        <div class="settings-card" style="margin-top: 16px;">
-          <div class="card-section-label">Голос и озвучка</div>
-          <div style="margin-top: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
-              <span style="font-size: 13px; color: var(--fg-muted);">Голосовых сегодня</span>
-              <span style="font-size: 20px; font-weight: 700; color: var(--accent-soft);">{{ auth.user?.voice_count_today || 0 }}<span style="font-size: 12px; color: var(--fg-subtle);">/20</span></span>
-            </div>
-            <div style="display: flex; gap: 3px;">
-              <div v-for="i in 20" :key="i" :style="{
-                flex: 1, height: '6px', borderRadius: '2px',
-                background: i <= (auth.user?.voice_count_today || 0) ? 'linear-gradient(90deg, #7c3aed, #6366f1)' : 'var(--surface-3)',
-              }"></div>
-            </div>
-            <div style="font-size: 11px; color: var(--fg-subtle); margin-top: 6px; font-family: var(--font-mono); letter-spacing: 0.08em;">лимит обнулится через 5 часов</div>
-          </div>
-        </div>
+      <!-- Mobile top bar -->
+      <div class="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)]
+                  bg-[#090514]/80 backdrop-blur-md px-4 md:hidden">
+        <router-link to="/chat"
+          class="flex items-center gap-2 text-sm text-[var(--fg-muted)] hover:text-[var(--fg)]
+                 transition-colors duration-150">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+          В чат
+        </router-link>
+        <span class="text-sm font-semibold text-[var(--fg)]">Настройки</span>
       </div>
 
-      <!-- General tab -->
-      <div v-else-if="activeTab === 'general'" class="tab-content animate-fade-in">
-        <h2 class="tab-heading">Основные</h2>
-
-        <!-- Behavior modes -->
-        <div class="settings-card">
-          <div class="card-section-label">Режим поведения</div>
-          <div v-if="modeError" class="mode-error">{{ modeError }}</div>
-          <div class="modes-grid">
-            <div
-              v-for="m in modes" :key="m.id"
-              @click="m.restricted && !auth.canNsfw ? null : setMode(m.id)"
-              :class="['mode-card', auth.user?.behavior_mode === m.id ? 'active' : '', m.restricted && !auth.canNsfw ? 'disabled' : '']"
-            >
-              <div class="mode-name">{{ m.name }}</div>
-              <div class="mode-desc">{{ m.desc }}</div>
-              <div v-if="m.restricted && !auth.canNsfw" class="mode-lock">✦ Premium или верификация 18+</div>
-              <div v-if="auth.user?.behavior_mode === m.id" class="mode-active-dot">●</div>
-            </div>
-          </div>
-          <div v-if="nsfwGeoBlocked" class="mode-geo-msg">✖ NSFW недоступен в вашем регионе</div>
-        </div>
-
-        <!-- Language -->
-        <div class="settings-card" style="margin-top: 16px;">
-          <div class="card-section-label">Язык интерфейса</div>
-          <div style="margin-top: 12px;">
-            <LanguageSwitcher />
-          </div>
-        </div>
+      <!-- Mobile tab switcher -->
+      <div class="flex gap-1 overflow-x-auto px-4 py-2.5 border-b border-[var(--border)] shrink-0 md:hidden"
+           style="scrollbar-width:none">
+        <button
+          v-for="t in tabs" :key="t.id"
+          @click="activeTab = t.id"
+          class="shrink-0 rounded-full px-3 py-1 text-xs font-mono tracking-wider uppercase
+                 border transition-all duration-150 whitespace-nowrap"
+          :class="activeTab === t.id
+            ? (t.danger ? 'bg-red-500/15 border-red-500/30 text-red-400' : 'bg-violet-600/20 border-violet-500/40 text-violet-300')
+            : (t.danger ? 'border-[var(--border)] text-red-400/60' : 'border-[var(--border)] text-[var(--fg-subtle)]')"
+        >{{ t.label }}</button>
       </div>
 
-      <!-- Billing tab -->
-      <div v-else-if="activeTab === 'billing'" class="tab-content animate-fade-in">
-        <h2 class="tab-heading">Подписка</h2>
-        <div class="settings-card" :class="auth.isPremium ? 'billing-card-premium' : ''">
-          <div class="card-section-label">Текущий план</div>
-          <div style="margin-top: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-            <div>
-              <div style="font-size: 24px; font-weight: 700; letter-spacing: -0.02em; color: var(--fg);">
-                {{ auth.user?.subscription_type === 'premium_plus' ? 'Premium+' : auth.isPremium ? 'Premium' : 'Базовый' }}
+      <!-- Content area -->
+      <div class="flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8" style="scrollbar-width:thin">
+        <div class="mx-auto max-w-2xl space-y-4">
+
+          <!-- ── Profile ── -->
+          <template v-if="activeTab === 'profile'">
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--fg)]">Профиль</h2>
+
+            <Card padding="md">
+              <div class="space-y-4">
+                <div class="flex items-center gap-4">
+                  <div class="flex size-14 items-center justify-center rounded-full
+                              bg-gradient-to-br from-indigo-600 to-fuchsia-600
+                              text-2xl font-bold text-white shrink-0">
+                    {{ (auth.user?.username || 'U')[0].toUpperCase() }}
+                  </div>
+                  <div>
+                    <div class="text-base font-semibold text-[var(--fg)]">{{ auth.user?.username }}</div>
+                    <div class="text-sm text-[var(--fg-muted)]">{{ auth.user?.email }}</div>
+                  </div>
+                </div>
+
+                <div class="border-t border-[var(--border)] pt-4 grid grid-cols-2 gap-4">
+                  <div>
+                    <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-1">Тариф</div>
+                    <div class="text-sm font-semibold"
+                         :class="auth.isPremium ? 'text-violet-300' : 'text-[var(--fg-muted)]'">
+                      {{ auth.user?.subscription_type === 'premium_plus' ? '✦ Premium+' : auth.isPremium ? '✦ Premium' : 'Free' }}
+                    </div>
+                  </div>
+                  <div>
+                    <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-1">Сообщений всего</div>
+                    <div class="text-sm font-semibold text-[var(--fg)]">{{ auth.user?.total_messages || 0 }}</div>
+                  </div>
+                  <div v-if="auth.user?.subscription_expires_at">
+                    <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-1">Подписка до</div>
+                    <div class="text-sm font-semibold text-[var(--fg)]">
+                      {{ new Date(auth.user.subscription_expires_at).toLocaleDateString('ru-RU') }}
+                    </div>
+                  </div>
+                  <div>
+                    <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-1">Верификация 18+</div>
+                    <div class="text-sm font-semibold" :class="auth.isKycVerified ? 'text-emerald-400' : 'text-[var(--fg-muted)]'">
+                      {{ auth.isKycVerified ? '✓ Подтверждено' : 'Не пройдена' }}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div v-if="auth.user?.subscription_expires_at" style="font-size: 12px; color: var(--fg-muted); margin-top: 4px;">
-                До {{ new Date(auth.user.subscription_expires_at).toLocaleDateString('ru-RU') }}
+            </Card>
+
+            <!-- Voice stats -->
+            <Card padding="md">
+              <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-3">Голосовых сообщений сегодня</div>
+              <div class="flex items-end justify-between mb-2">
+                <span class="text-3xl font-semibold text-violet-300">{{ auth.user?.voice_count_today || 0 }}</span>
+                <span class="text-sm text-[var(--fg-subtle)]">/ 20</span>
               </div>
-            </div>
-            <div v-if="auth.isPremium" class="premium-active-badge">● Активен</div>
-          </div>
+              <div class="flex gap-1">
+                <div
+                  v-for="i in 20" :key="i"
+                  class="flex-1 h-1.5 rounded-sm transition-all duration-300"
+                  :class="i <= (auth.user?.voice_count_today || 0)
+                    ? 'bg-gradient-to-r from-violet-600 to-indigo-600'
+                    : 'bg-[var(--surface-3)]'"
+                />
+              </div>
+            </Card>
+          </template>
 
-          <div v-if="auth.isPremium" style="margin-top: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--fg-muted); margin-bottom: 6px;">
-              <span>Сообщений сегодня</span>
-              <span>{{ auth.user?.daily_messages_count || 0 }} / ∞</span>
+          <!-- ── General ── -->
+          <template v-else-if="activeTab === 'general'">
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--fg)]">Основные</h2>
+
+            <!-- Mode error -->
+            <div v-if="modeError"
+                 class="rounded-[8px] border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+              {{ modeError }}
             </div>
-          </div>
-        </div>
-        <div style="margin-top: 16px;">
-          <router-link v-if="!auth.isPremium" to="/pricing" class="btn-primary" style="text-decoration: none;">
-            ✦ Перейти на Premium
-          </router-link>
+
+            <Card padding="md">
+              <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-3">Режим поведения</div>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <div
+                  v-for="m in modes" :key="m.id"
+                  @click="m.restricted && !auth.canNsfw ? undefined : setMode(m.id)"
+                  class="flex flex-col gap-1 rounded-[10px] border p-3 transition-all duration-150"
+                  :class="[
+                    auth.user?.behavior_mode === m.id
+                      ? 'bg-violet-500/15 border-violet-500/40'
+                      : 'border-[var(--border)] hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)]',
+                    m.restricted && !auth.canNsfw ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+                  ]"
+                >
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-[var(--fg)]">{{ m.name }}</span>
+                    <span v-if="auth.user?.behavior_mode === m.id"
+                          class="text-[10px] text-violet-400">● активен</span>
+                    <span v-else-if="m.restricted && !auth.canNsfw"
+                          class="text-[10px] text-[var(--fg-subtle)]">✦ Premium</span>
+                  </div>
+                  <p class="text-xs text-[var(--fg-muted)]">{{ m.desc }}</p>
+                  <p v-if="m.restricted && nsfwGeoBlocked" class="text-xs text-red-400">✖ Недоступно в регионе</p>
+                </div>
+              </div>
+            </Card>
+          </template>
+
+          <!-- ── Billing ── -->
+          <template v-else-if="activeTab === 'billing'">
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--fg)]">Подписка</h2>
+
+            <Card padding="md" :class="auth.isPremium ? 'border-violet-500/30 shadow-[0_0_32px_-8px_rgb(124_58_237_/_0.3)]' : ''">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-2">Текущий план</div>
+                  <div class="text-3xl font-semibold tracking-tight text-[var(--fg)]">
+                    {{ auth.user?.subscription_type === 'premium_plus' ? 'Premium+' : auth.isPremium ? 'Premium' : 'Базовый' }}
+                  </div>
+                  <div v-if="auth.user?.subscription_expires_at" class="mt-1 text-sm text-[var(--fg-muted)]">
+                    Активна до {{ new Date(auth.user.subscription_expires_at).toLocaleDateString('ru-RU') }}
+                  </div>
+                </div>
+                <div v-if="auth.isPremium"
+                     class="shrink-0 rounded-full bg-emerald-500/15 border border-emerald-500/30
+                            px-3 py-1 text-xs font-mono text-emerald-400">
+                  ● Активна
+                </div>
+              </div>
+
+              <div v-if="auth.isPremium" class="mt-4 border-t border-[var(--border)] pt-4">
+                <div class="flex justify-between text-sm text-[var(--fg-muted)] mb-2">
+                  <span>Сообщений сегодня</span>
+                  <span>{{ auth.user?.daily_messages_count || 0 }} / ∞</span>
+                </div>
+              </div>
+            </Card>
+
+            <div v-if="!auth.isPremium" class="flex gap-3">
+              <Button variant="primary" size="md" as="router-link" to="/pricing">
+                ✦ Перейти на Premium
+              </Button>
+            </div>
+
+            <!-- Feature comparison -->
+            <Card padding="md">
+              <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-3">Что входит в Premium</div>
+              <ul class="space-y-2">
+                <li v-for="feat in ['500 сообщений в день', 'Все персонажи платформы', 'Голосовые ответы', 'NSFW-режим', 'Расширенный контекст']"
+                    :key="feat" class="flex items-center gap-2 text-sm text-[var(--fg-muted)]">
+                  <svg class="size-4 shrink-0 text-violet-400" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
+                  </svg>
+                  {{ feat }}
+                </li>
+              </ul>
+            </Card>
+          </template>
+
+          <!-- ── Privacy ── -->
+          <template v-else-if="activeTab === 'privacy'">
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--fg)]">Приватность</h2>
+
+            <!-- KYC status -->
+            <Card padding="md">
+              <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-3">
+                Верификация возраста (18+)
+              </div>
+
+              <div v-if="kycLoading" class="flex items-center gap-2 text-sm text-[var(--fg-muted)]">
+                <svg class="size-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                </svg>
+                Проверяем результат верификации...
+              </div>
+
+              <div v-else-if="kycSuccess || auth.isKycVerified"
+                   class="flex items-center gap-2 text-sm text-emerald-400">
+                <svg class="size-4" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
+                </svg>
+                Возраст подтверждён — NSFW разблокирован
+              </div>
+
+              <template v-else>
+                <div v-if="kycError" class="mb-3 rounded-[8px] border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                  {{ kycError }}
+                </div>
+                <p class="text-sm text-[var(--fg-muted)] mb-4 leading-relaxed">
+                  Подтверди возраст через сервис Didit, чтобы разблокировать NSFW-режим без Premium.
+                  После нажатия откроется новая вкладка.
+                </p>
+                <Button variant="ghost" size="sm" @click="showKyc = true">
+                  Подтвердить возраст 18+
+                </Button>
+              </template>
+            </Card>
+
+            <Card padding="md">
+              <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-3">Данные и приватность</div>
+              <p class="text-sm text-[var(--fg-muted)] leading-relaxed">
+                Ваши диалоги хранятся в зашифрованном виде. Мы не продаём данные и не передаём третьим лицам.
+                Удалить все данные можно в разделе «Аккаунт».
+              </p>
+            </Card>
+          </template>
+
+          <!-- ── Account (danger zone) ── -->
+          <template v-else-if="activeTab === 'account'">
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--fg)]">Аккаунт</h2>
+
+            <Card padding="md">
+              <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-4">Безопасность</div>
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <div class="text-sm font-medium text-[var(--fg)]">Сменить пароль</div>
+                  <div class="text-xs text-[var(--fg-muted)] mt-0.5">Обновить пароль от аккаунта</div>
+                </div>
+                <Button variant="ghost" size="sm" @click="openPasswordModal">Сменить</Button>
+              </div>
+            </Card>
+
+            <!-- Danger zone -->
+            <Card padding="md" class="border-red-500/20">
+              <div class="text-[11px] font-mono tracking-wider uppercase text-red-400/80 mb-4">Опасная зона</div>
+              <div class="space-y-4">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <div class="text-sm font-medium text-[var(--fg)]">Очистить историю чата</div>
+                    <div class="text-xs text-[var(--fg-muted)] mt-0.5">Удалит все сообщения безвозвратно</div>
+                  </div>
+                  <Button
+                    variant="ghost" size="sm"
+                    class="!text-red-400 !border-red-500/30 hover:!bg-red-500/10"
+                    @click="clearChat"
+                  >Очистить</Button>
+                </div>
+                <div class="border-t border-[var(--border)] pt-4 flex items-center justify-between gap-4">
+                  <div>
+                    <div class="text-sm font-medium text-[var(--fg)]">Удалить аккаунт</div>
+                    <div class="text-xs text-[var(--fg-muted)] mt-0.5">Все данные будут удалены навсегда</div>
+                  </div>
+                  <Button
+                    variant="ghost" size="sm"
+                    class="!text-red-400 !border-red-500/30 hover:!bg-red-500/10"
+                    @click="openDeleteModal"
+                  >Удалить</Button>
+                </div>
+              </div>
+            </Card>
+          </template>
+
         </div>
       </div>
-
-      <!-- Privacy tab -->
-      <div v-else-if="activeTab === 'privacy'" class="tab-content animate-fade-in">
-        <h2 class="tab-heading">Приватность</h2>
-
-        <!-- KYC -->
-        <div class="settings-card">
-          <div class="card-section-label">Верификация возраста (18+)</div>
-          <div v-if="kycLoading" class="info-msg">● Проверяем результат верификации...</div>
-          <div v-if="kycSuccess" class="success-msg">✓ Возраст подтверждён — NSFW разблокирован</div>
-          <div v-if="kycError" class="error-msg">{{ kycError }}</div>
-          <div v-if="auth.isKycVerified" class="success-msg" style="margin-top: 8px;">✓ Возраст подтверждён через Didit</div>
-          <div v-else-if="!kycLoading && !kycSuccess && !nsfwGeoBlocked" style="margin-top: 12px;">
-            <p style="font-size: 13px; color: var(--fg-muted); margin-bottom: 12px; line-height: 1.5;">
-              Подтверди возраст, чтобы разблокировать NSFW без Premium.
-            </p>
-            <button class="btn-ghost btn-sm" @click="showKyc = true">Подтвердить возраст 18+</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Account tab (danger zone) -->
-      <div v-else-if="activeTab === 'account'" class="tab-content animate-fade-in">
-        <h2 class="tab-heading">Аккаунт</h2>
-
-        <div class="settings-card">
-          <div class="card-section-label">Безопасность</div>
-          <div class="settings-row" style="border-bottom: none;">
-            <div>
-              <div style="font-size: 14px; color: var(--fg);">Сменить пароль</div>
-              <div style="font-size: 12px; color: var(--fg-muted);">Обновить пароль от аккаунта</div>
-            </div>
-            <button class="btn-ghost btn-sm" @click="openPasswordModal">Сменить</button>
-          </div>
-        </div>
-
-        <div class="settings-card danger-card" style="margin-top: 16px;">
-          <div class="card-section-label" style="color: var(--danger);">Опасная зона</div>
-          <div class="settings-row">
-            <div>
-              <div style="font-size: 14px; color: var(--fg);">Очистить историю чата</div>
-              <div style="font-size: 12px; color: var(--fg-muted);">Удалит все сообщения безвозвратно</div>
-            </div>
-            <button class="btn-ghost btn-sm danger-btn" @click="clearChat">Очистить</button>
-          </div>
-          <div class="settings-row" style="border-bottom: none;">
-            <div>
-              <div style="font-size: 14px; color: var(--fg);">Удалить аккаунт</div>
-              <div style="font-size: 12px; color: var(--fg-muted);">Все данные будут удалены навсегда</div>
-            </div>
-            <button class="btn-ghost btn-sm danger-btn" @click="openDeleteModal">Удалить</button>
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
 
-  <!-- KYC Modal -->
-  <Teleport to="body">
-    <div v-if="showKyc" class="modal-overlay" @click.self="showKyc = false">
-      <div class="modal-box">
-        <h3 class="modal-title">Подтверждение возраста 18+</h3>
-        <p class="modal-body">Для доступа к NSFW-контенту необходимо пройти верификацию возраста через сервис <strong>Didit</strong>. После нажатия откроется новая вкладка. Вернитесь сюда после завершения — статус обновится автоматически.</p>
-        <div v-if="kycError" class="error-msg" style="margin-bottom: 12px;">{{ kycError }}</div>
-        <div class="modal-actions">
-          <button class="btn-primary btn-sm" :disabled="kycLoading" @click="startKycVerification">
-            {{ kycLoading ? 'Открываем...' : 'Начать верификацию' }}
-          </button>
-          <button class="btn-ghost btn-sm" @click="showKyc = false">Отмена</button>
-        </div>
+  <!-- ─── KYC Modal ──────────────────────────────────────────────────── -->
+  <Modal :open="showKyc" title="Подтверждение возраста 18+" size="sm"
+         @update:open="val => !val && (showKyc = false)" @close="showKyc = false">
+    <div class="space-y-4">
+      <p class="text-sm text-[var(--fg-muted)] leading-relaxed">
+        Для доступа к NSFW-контенту необходимо пройти верификацию через <strong class="text-[var(--fg)]">Didit</strong>.
+        После нажатия откроется новая вкладка — вернитесь сюда после завершения.
+      </p>
+      <div v-if="kycError"
+           class="rounded-[8px] border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+        {{ kycError }}
       </div>
     </div>
-  </Teleport>
+    <template #footer>
+      <div class="flex gap-2">
+        <Button variant="primary" size="md" :loading="kycLoading" @click="startKycVerification">
+          Начать верификацию
+        </Button>
+        <Button variant="ghost" size="md" @click="showKyc = false">Отмена</Button>
+      </div>
+    </template>
+  </Modal>
 
-  <!-- Password Modal -->
-  <Teleport to="body">
-    <div v-if="showPasswordModal" class="modal-overlay" @click.self="showPasswordModal = false">
-      <div class="modal-box">
-        <h3 class="modal-title">Смена пароля</h3>
-        <div v-if="pwSuccess" class="success-msg" style="margin-bottom: 12px;">Пароль успешно изменён</div>
-        <div v-if="pwError" class="error-msg" style="margin-bottom: 12px;">{{ pwError }}</div>
-        <div class="modal-fields">
-          <div class="field">
-            <label class="field-label">Текущий пароль</label>
-            <input type="password" v-model="pwCurrent" class="m-input" placeholder="••••••••" />
-          </div>
-          <div class="field">
-            <label class="field-label">Новый пароль (мин. 8 символов)</label>
-            <input type="password" v-model="pwNew" class="m-input" placeholder="••••••••" />
-          </div>
-          <div class="field">
-            <label class="field-label">Повторите новый пароль</label>
-            <input type="password" v-model="pwConfirm" class="m-input" placeholder="••••••••" @keyup.enter="submitPasswordChange" />
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn-primary btn-sm" :disabled="pwLoading" @click="submitPasswordChange">
-            {{ pwLoading ? 'Сохранение...' : 'Сохранить' }}
-          </button>
-          <button class="btn-ghost btn-sm" @click="showPasswordModal = false">Отмена</button>
-        </div>
+  <!-- ─── Password Modal ────────────────────────────────────────────── -->
+  <Modal :open="showPasswordModal" title="Смена пароля" size="sm"
+         @update:open="val => !val && (showPasswordModal = false)" @close="showPasswordModal = false">
+    <div class="space-y-4">
+      <div v-if="pwSuccess"
+           class="rounded-[8px] border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
+        Пароль успешно изменён
       </div>
+      <div v-if="pwError"
+           class="rounded-[8px] border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+        {{ pwError }}
+      </div>
+      <Input v-model="pwCurrent" label="Текущий пароль" type="password" placeholder="••••••••" />
+      <Input v-model="pwNew" label="Новый пароль" type="password" placeholder="Мин. 8 символов" hint="Минимум 8 символов" />
+      <Input v-model="pwConfirm" label="Повторите пароль" type="password" placeholder="••••••••" />
     </div>
-  </Teleport>
+    <template #footer>
+      <div class="flex gap-2">
+        <Button variant="primary" size="md" :loading="pwLoading" @click="submitPasswordChange">Сохранить</Button>
+        <Button variant="ghost" size="md" @click="showPasswordModal = false">Отмена</Button>
+      </div>
+    </template>
+  </Modal>
 
-  <!-- Delete Modal -->
-  <Teleport to="body">
-    <div v-if="showDeleteModal" class="modal-overlay" @click.self="showDeleteModal = false">
-      <div class="modal-box">
-        <h3 class="modal-title" style="color: var(--danger);">Удалить аккаунт</h3>
-        <p class="modal-body">Это действие необратимо. Все ваши данные, история чатов и настройки будут удалены навсегда.</p>
-        <div v-if="deleteError" class="error-msg" style="margin-bottom: 12px;">{{ deleteError }}</div>
-        <div class="field" style="margin-bottom: 16px;">
-          <label class="field-label">Введите пароль для подтверждения</label>
-          <input type="password" v-model="deletePassword" class="m-input" placeholder="••••••••" @keyup.enter="submitDelete" />
-        </div>
-        <div class="modal-actions">
-          <button class="btn-ghost btn-sm danger-btn" :disabled="deleteLoading" @click="submitDelete">
-            {{ deleteLoading ? 'Удаление...' : 'Удалить навсегда' }}
-          </button>
-          <button class="btn-ghost btn-sm" @click="showDeleteModal = false">Отмена</button>
-        </div>
+  <!-- ─── Delete Modal ──────────────────────────────────────────────── -->
+  <Modal :open="showDeleteModal" title="Удалить аккаунт" size="sm"
+         @update:open="val => !val && (showDeleteModal = false)" @close="showDeleteModal = false">
+    <div class="space-y-4">
+      <p class="text-sm text-[var(--fg-muted)] leading-relaxed">
+        Это действие <strong class="text-red-400">необратимо</strong>. Все ваши данные, история чатов
+        и настройки будут удалены навсегда.
+      </p>
+      <div v-if="deleteError"
+           class="rounded-[8px] border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+        {{ deleteError }}
       </div>
+      <Input v-model="deletePassword" label="Пароль для подтверждения" type="password" placeholder="••••••••" />
     </div>
-  </Teleport>
+    <template #footer>
+      <div class="flex gap-2">
+        <Button
+          variant="ghost" size="md"
+          class="!text-red-400 !border-red-500/30 hover:!bg-red-500/10"
+          :loading="deleteLoading"
+          @click="submitDelete"
+        >Удалить навсегда</Button>
+        <Button variant="ghost" size="md" @click="showDeleteModal = false">Отмена</Button>
+      </div>
+    </template>
+  </Modal>
 </template>
-
-<style scoped>
-.settings-root {
-  height: 100vh;
-  height: 100dvh;
-  display: flex;
-  background: var(--bg);
-  color: var(--fg);
-  overflow: hidden;
-  position: relative;
-  z-index: 1;
-}
-
-/* ── Sidebar ── */
-.settings-sidebar {
-  width: 220px;
-  flex-shrink: 0;
-  background: rgb(18 13 36 / 0.85);
-  backdrop-filter: blur(16px);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  padding: 16px 0;
-}
-.sb-brand {
-  padding: 0 16px 16px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
-}
-.sb-logo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-}
-.sb-logo-box {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #7c3aed, #6366f1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-ui);
-  font-weight: 700;
-  font-size: 13px;
-  color: #fff;
-  box-shadow: 0 0 10px -3px rgb(124 58 237 / 0.5);
-}
-.sb-logo-text {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--fg);
-}
-.sb-nav {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 4px 10px;
-}
-.sb-tab {
-  width: 100%;
-  text-align: left;
-  padding: 9px 12px;
-  border: none;
-  border-radius: var(--radius-lg);
-  background: transparent;
-  color: var(--fg-muted);
-  font-family: var(--font-ui);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.sb-tab:hover { background: var(--surface-2); color: var(--fg); }
-.sb-tab.active {
-  background: rgb(124 58 237 / 0.15);
-  color: #c4b5fd;
-  box-shadow: inset 0 0 0 1px rgb(124 58 237 / 0.25);
-}
-.sb-tab.danger { color: rgb(252 165 165 / 0.7); }
-.sb-tab.danger:hover { background: rgb(239 68 68 / 0.1); color: #fca5a5; }
-.sb-tab.danger.active { background: rgb(239 68 68 / 0.12); color: #fca5a5; box-shadow: inset 0 0 0 1px rgb(239 68 68 / 0.25); }
-.sb-footer {
-  padding: 12px 10px 0;
-  border-top: 1px solid var(--border);
-}
-
-/* ── Main ── */
-.settings-main {
-  flex: 1;
-  padding: 32px 40px;
-  overflow-y: auto;
-  min-width: 0;
-}
-.tab-content { max-width: 680px; }
-.tab-heading {
-  font-family: var(--font-ui);
-  font-weight: 700;
-  font-size: 22px;
-  letter-spacing: -0.02em;
-  color: var(--fg);
-  margin-bottom: 24px;
-}
-
-/* ── Cards ── */
-.settings-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-}
-.billing-card-premium {
-  border-color: rgb(124 58 237 / 0.35);
-  box-shadow: 0 0 32px -8px rgb(124 58 237 / 0.3);
-}
-.danger-card {
-  border-color: rgb(239 68 68 / 0.2);
-}
-.card-section-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--border);
-}
-
-.settings-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
-}
-.row-label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-  flex-shrink: 0;
-}
-.row-value {
-  font-size: 14px;
-  color: var(--fg-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: right;
-}
-
-.premium-active-badge {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent-soft);
-  background: rgb(124 58 237 / 0.15);
-  border: 1px solid rgb(124 58 237 / 0.3);
-  border-radius: var(--radius-sm);
-  padding: 4px 10px;
-}
-
-/* ── Modes ── */
-.modes-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  background: var(--border);
-  margin-top: 0;
-}
-.mode-card {
-  padding: 16px;
-  background: var(--surface);
-  cursor: pointer;
-  transition: background 0.15s;
-  position: relative;
-}
-.mode-card:hover { background: var(--surface-2); }
-.mode-card.active { background: rgb(124 58 237 / 0.12); }
-.mode-card.disabled { opacity: 0.5; cursor: not-allowed; }
-.mode-name {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--fg);
-  margin-bottom: 5px;
-}
-.mode-card.active .mode-name { color: var(--accent-soft); }
-.mode-desc { font-size: 12px; color: var(--fg-muted); line-height: 1.4; }
-.mode-lock { font-family: var(--font-mono); font-size: 9px; color: var(--fg-subtle); margin-top: 6px; letter-spacing: 0.08em; text-transform: uppercase; }
-.mode-active-dot { position: absolute; top: 10px; right: 12px; color: var(--accent-soft); font-size: 8px; }
-
-.mode-error {
-  background: rgb(245 158 11 / 0.1);
-  border-bottom: 1px solid rgb(245 158 11 / 0.2);
-  padding: 10px 16px;
-  font-size: 12px;
-  color: rgb(251 191 36);
-}
-.mode-geo-msg {
-  padding: 10px 16px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--danger);
-}
-
-/* Status messages */
-.info-msg {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--fg-muted);
-  padding: 10px 20px;
-  letter-spacing: 0.08em;
-}
-.success-msg {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--success);
-  padding: 10px 20px;
-  letter-spacing: 0.08em;
-}
-.error-msg {
-  background: rgb(239 68 68 / 0.1);
-  border: 1px solid rgb(239 68 68 / 0.3);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
-  font-size: 13px;
-  color: #fca5a5;
-}
-
-.danger-btn {
-  border-color: rgb(239 68 68 / 0.4) !important;
-  color: #fca5a5 !important;
-}
-.danger-btn:hover {
-  background: rgb(239 68 68 / 0.1) !important;
-}
-
-/* ── Modals ── */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.65);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 500;
-  padding: 24px;
-  backdrop-filter: blur(4px);
-}
-.modal-box {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  padding: 28px;
-  max-width: 440px;
-  width: 100%;
-  box-shadow: 0 0 48px -8px rgb(124 58 237 / 0.3);
-}
-.modal-title {
-  font-family: var(--font-ui);
-  font-weight: 700;
-  font-size: 20px;
-  letter-spacing: -0.02em;
-  color: var(--fg);
-  margin-bottom: 12px;
-}
-.modal-body {
-  font-size: 14px;
-  color: var(--fg-muted);
-  line-height: 1.6;
-  margin-bottom: 20px;
-}
-.modal-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
-}
-.modal-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* ── Mobile ── */
-@media (max-width: 768px) {
-  .settings-root { flex-direction: column; }
-  .settings-sidebar {
-    width: 100%;
-    flex-direction: row;
-    padding: 0;
-    height: 50px;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-    flex-shrink: 0;
-  }
-  .sb-brand { display: none; }
-  .sb-footer { display: none; }
-  .sb-nav {
-    flex-direction: row;
-    padding: 6px 12px;
-    gap: 4px;
-    overflow-x: auto;
-    flex: 1;
-  }
-  .sb-tab { white-space: nowrap; flex-shrink: 0; font-size: 12px; padding: 7px 10px; }
-  .settings-main { padding: 20px 16px; }
-  .modes-grid { grid-template-columns: 1fr; }
-}
-</style>
