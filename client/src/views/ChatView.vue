@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useChatStore } from '../stores/chat'
 import Modal from '../components/ui/Modal.vue'
-import Button from '../components/ui/Button.vue'
 import CharacterPickerModal from '../components/CharacterPickerModal.vue'
 
 const router = useRouter()
