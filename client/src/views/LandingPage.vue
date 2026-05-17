@@ -1,590 +1,359 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useChatStore } from '../stores/chat'
+import Button from '../components/ui/Button.vue'
+import Input  from '../components/ui/Input.vue'
+import Card   from '../components/ui/Card.vue'
 
 const router = useRouter()
-const auth = useAuthStore()
+const auth   = useAuthStore()
+const chat   = useChatStore()
 
-const landingQuotes = [
-  '«Ты опоздал на пять минут.\nНо я тебе прощу.»',
-  '«Долго не заходил.\nЯ начала придумывать причины.»',
-  '«Хочешь поговорить?\nЯ никуда не спешу.»',
-  '«Сегодня ты выглядишь задумчивым.\nРасскажи, что случилось.»',
-  '«Я здесь. Как всегда.\nЖду тебя.»',
-  '«У меня есть мысли, которые я хочу тебе рассказать.\nНо ты должен спросить.»',
-]
-const landingQuote = ref(landingQuotes[Math.floor(Math.random() * landingQuotes.length)])
+const search         = ref('')
+const activeCategory = ref('Все')
+
+const categories = ['Все', 'Романтика', 'Фэнтези', 'Аниме', 'Психология', 'Учёба', 'Бизнес', 'Приключения']
 
 const features = [
-  { icon: '💬', title: 'Ролевой чат', desc: 'Глубокие диалоги с уникальными AI-персонажами с памятью и характером.' },
-  { icon: '🎙️', title: 'Голосовые', desc: 'Слышь живой голос персонажа — MiniMax TTS. Автовоспроизведение.' },
-  { icon: '🖼️', title: 'Фото', desc: 'Отправляй изображения — персонаж видит и реагирует.' },
-  { icon: '🎭', title: 'Режимы', desc: 'Учёба, работа, психолог и NSFW (18+) — выбери контекст.' },
+  {
+    icon: '🧠',
+    title: 'Умные персонажи',
+    desc: 'Каждый персонаж имеет уникальную личность, стиль речи и историю. AI адаптируется к вашему общению.',
+  },
+  {
+    icon: '🔊',
+    title: 'Голосовые ответы',
+    desc: 'Персонажи говорят. Реалистичный TTS-движок передаёт интонации и характер.',
+  },
+  {
+    icon: '🖼️',
+    title: 'Анализ изображений',
+    desc: 'Отправляйте фото — персонаж видит и реагирует. Учёба, творчество, игра.',
+  },
+  {
+    icon: '🔒',
+    title: 'Приватность',
+    desc: 'Все диалоги хранятся только у вас. Мы не читаем ваши переписки.',
+  },
 ]
 
-onMounted(() => {
-  if (auth.isAuthenticated) router.push('/chat')
+const plans = [
+  {
+    id: 'free',
+    name: 'Бесплатно',
+    price: '0',
+    period: '',
+    features: ['50 сообщений в день', '2 каноничных персонажа', 'Базовый контекст', 'Создание персонажей'],
+    cta: 'Начать бесплатно',
+    highlight: false,
+  },
+  {
+    id: 'premium',
+    name: 'Premium',
+    price: '299',
+    period: '/мес',
+    features: ['500 сообщений в день', 'Все персонажи', 'Голосовые ответы', 'NSFW-режим', 'Расширенный контекст'],
+    cta: 'Выбрать Premium',
+    highlight: true,
+  },
+  {
+    id: 'premium_plus',
+    name: 'Premium+',
+    price: '599',
+    period: '/мес',
+    features: ['Безлимит голоса', '100k токенов контекста', 'Приоритетный доступ', 'Ранний доступ к фичам'],
+    cta: 'Выбрать Premium+',
+    highlight: false,
+  },
+]
+
+onMounted(async () => {
+  if (auth.isAuthenticated) { router.push('/chat'); return }
+  if (chat.characters.length === 0) await chat.fetchCharacters()
 })
+
+function goToChat() {
+  router.push(auth.isAuthenticated ? '/chat' : '/register')
+}
+
+function goToLogin() {
+  router.push('/login')
+}
 </script>
 
 <template>
-  <div class="landing-root">
+  <div class="min-h-screen bg-[#090514] text-[var(--fg)]">
 
-    <!-- NAV -->
-    <nav class="landing-nav">
-      <router-link to="/" class="nav-logo">
-        <div class="logo-box">M</div>
-        <span class="logo-text">Morgan AI</span>
-      </router-link>
-      <div class="nav-links">
-        <router-link to="/pricing" class="nav-link">Тарифы</router-link>
-        <router-link to="/legal" class="nav-link">Документы</router-link>
-        <router-link to="/login" class="btn-ghost btn-sm" style="text-decoration: none;">Войти</router-link>
-        <router-link to="/register" class="btn-primary btn-sm" style="text-decoration: none;">
-          Начать
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </router-link>
-      </div>
-    </nav>
+    <!-- ─── Navbar ─────────────────────────────────────────────────── -->
+    <header class="sticky top-0 z-40 border-b border-violet-500/10 bg-[#090514]/80 backdrop-blur-md">
+      <nav class="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4">
 
-    <!-- MANGA PANELS -->
-    <div class="panels-wrap animate-fade-in">
-      <div class="panels-grid">
-
-        <!-- Art panel -->
-        <div class="panel panel-art">
-          <img :src="'/characters/morgan-hero.png'" alt="Морган" class="panel-art-img" />
-          <!-- Dialogue box -->
-          <div class="panel-dialogue">
-            <div class="panel-dialogue-label">МОРГАН</div>
-            <p class="panel-dialogue-text">{{ landingQuote }}</p>
+        <!-- Logo -->
+        <a href="/" class="flex items-center gap-2.5 shrink-0">
+          <div class="flex size-8 items-center justify-center rounded-[8px]
+                      bg-gradient-to-br from-violet-600 to-indigo-600
+                      text-white text-sm font-bold shadow-[0_4px_12px_-4px_rgb(124_58_237_/_0.6)]">
+            M
           </div>
+          <span class="text-sm font-semibold text-[var(--fg)] tracking-tight">Morgan AI</span>
+        </a>
+
+        <!-- Desktop links -->
+        <div class="hidden md:flex items-center gap-1">
+          <a href="#features"
+             class="px-3 py-1.5 text-sm text-[var(--fg-muted)] hover:text-[var(--fg)]
+                    rounded-[8px] hover:bg-[var(--surface-2)] transition-colors duration-150">
+            Возможности
+          </a>
+          <a href="#pricing"
+             class="px-3 py-1.5 text-sm text-[var(--fg-muted)] hover:text-[var(--fg)]
+                    rounded-[8px] hover:bg-[var(--surface-2)] transition-colors duration-150">
+            Тарифы
+          </a>
+          <router-link to="/legal"
+             class="px-3 py-1.5 text-sm text-[var(--fg-muted)] hover:text-[var(--fg)]
+                    rounded-[8px] hover:bg-[var(--surface-2)] transition-colors duration-150">
+            Документы
+          </router-link>
         </div>
 
-        <!-- Hero text panel -->
-        <div class="panel panel-hero">
-          <div class="panel-chapter-label">
-            <span class="chapter-dot"></span>
-            ГЛАВА 一 · ПЕРВАЯ ВСТРЕЧА
-          </div>
-          <h1 class="panel-heading">
-            История,<br />
-            <em>которую</em><br />
-            пишешь<br />
-            ты.
-          </h1>
-          <div class="panel-badge">18+</div>
+        <!-- Auth buttons -->
+        <div class="flex items-center gap-2 shrink-0">
+          <Button variant="ghost" size="sm" @click="goToLogin">Войти</Button>
+          <Button variant="primary" size="sm" @click="goToChat">Начать бесплатно</Button>
         </div>
+      </nav>
+    </header>
 
-        <!-- Voice panel -->
-        <div class="panel panel-voice">
-          <div class="voice-icon-wrap">
-            <div class="voice-icon">
-              <svg width="10" height="12" viewBox="0 0 10 12" fill="none">
-                <path d="M1 1L9 6L1 11V1Z" fill="var(--accent-soft)" stroke="var(--accent-soft)" stroke-width="1" stroke-linejoin="round" />
-              </svg>
-            </div>
-            <span class="voice-label">Голос</span>
-          </div>
-          <p class="voice-text">Услышь, как она смеётся.</p>
-        </div>
+    <!-- ─── Hero ───────────────────────────────────────────────────── -->
+    <section class="relative mx-auto max-w-6xl px-4 pt-20 pb-16 text-center md:pt-28 md:pb-24">
 
-        <!-- Memory panel -->
-        <div class="panel panel-memory">
-          <span class="memory-label">Память</span>
-          <p class="memory-text">Помнит, что было вчера.</p>
-        </div>
-
+      <!-- Ambient glow -->
+      <div class="pointer-events-none absolute inset-0 overflow-hidden">
+        <div class="absolute left-1/2 top-0 h-[500px] w-[800px] -translate-x-1/2
+                    rounded-full bg-violet-600/10 blur-[120px]" />
       </div>
-    </div>
 
-    <!-- CTA BAR -->
-    <div class="cta-bar">
-      <div class="cta-left">
-        <router-link to="/register" class="btn-primary" style="text-decoration: none; font-size: 15px; padding: 13px 28px;">
-          Начать историю
-        </router-link>
-        <div class="cta-free-badge">
-          <div class="free-circle">无料</div>
-          <span class="cta-free-text">Бесплатно. 50 сообщений в день.</span>
+      <!-- Badge -->
+      <div class="mb-6 inline-flex items-center gap-2 rounded-full border border-violet-500/20
+                  bg-violet-500/5 px-4 py-1.5 text-xs font-mono tracking-widest
+                  text-violet-400 uppercase">
+        <span class="size-1.5 rounded-full bg-violet-400 animate-pulse" />
+        18+ · AI Role-Play Platform
+      </div>
+
+      <!-- Headline -->
+      <h1 class="mb-5 text-4xl font-semibold tracking-[-0.03em] leading-[1.15] md:text-6xl lg:text-7xl">
+        Живые персонажи,<br />
+        <span class="bg-gradient-to-r from-violet-300 via-fuchsia-300 to-indigo-300
+                     bg-clip-text text-transparent">
+          настоящий диалог
+        </span>
+      </h1>
+
+      <p class="mx-auto mb-8 max-w-xl text-base text-[var(--fg-muted)] leading-relaxed md:text-lg">
+        Общайтесь с уникальными AI-персонажами. Учёба, творчество, ролевые игры —
+        или просто интересный разговор.
+      </p>
+
+      <!-- CTAs -->
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
+        <Button variant="primary" size="lg" @click="goToChat">Начать бесплатно</Button>
+        <Button variant="ghost" size="lg" @click="goToLogin">Уже есть аккаунт</Button>
+      </div>
+
+      <!-- Stats -->
+      <div class="flex items-center justify-center gap-8 text-center">
+        <div>
+          <div class="text-2xl font-semibold text-[var(--fg)]">10+</div>
+          <div class="text-xs text-[var(--fg-subtle)] font-mono tracking-wider uppercase">Персонажей</div>
         </div>
-      </div>
-      <div class="cta-stats">
-        <span>12 персонажей</span>
-        <span>·</span>
-        <span>русский / english</span>
-        <span>·</span>
-        <span>premium 299₽/мес</span>
-      </div>
-    </div>
-
-    <!-- FEATURES -->
-    <section class="features-section">
-      <div class="features-label">
-        <span class="features-label-num">02</span>
-        ВОЗМОЖНОСТИ
-      </div>
-      <div class="features-grid">
-        <div
-          v-for="f in features" :key="f.title"
-          class="feature-card card-hover"
-        >
-          <div class="feature-icon">{{ f.icon }}</div>
-          <div class="feature-title">{{ f.title }}</div>
-          <div class="feature-desc">{{ f.desc }}</div>
+        <div class="h-8 w-px bg-[var(--border)]" />
+        <div>
+          <div class="text-2xl font-semibold text-[var(--fg)]">100%</div>
+          <div class="text-xs text-[var(--fg-subtle)] font-mono tracking-wider uppercase">Приватно</div>
+        </div>
+        <div class="h-8 w-px bg-[var(--border)]" />
+        <div>
+          <div class="text-2xl font-semibold text-[var(--fg)]">Free</div>
+          <div class="text-xs text-[var(--fg-subtle)] font-mono tracking-wider uppercase">Старт</div>
         </div>
       </div>
     </section>
 
-    <!-- FOOTER -->
-    <footer class="landing-footer">
-      <div class="footer-brand">
-        <div class="logo-box logo-box-sm">M</div>
-        <span class="footer-brand-name">Morgan AI</span>
+    <!-- ─── Characters ─────────────────────────────────────────────── -->
+    <section class="mx-auto max-w-6xl px-4 pb-20">
+
+      <!-- Search -->
+      <div class="mb-5">
+        <Input v-model="search" placeholder="Найти персонажа..." class="max-w-sm" />
       </div>
-      <div class="footer-links">
-        <router-link to="/pricing" class="footer-link">Тарифы</router-link>
-        <router-link to="/legal" class="footer-link">Политика</router-link>
-        <router-link to="/legal/oferta" class="footer-link">Оферта</router-link>
-        <a href="https://github.com/MikhailFur/morganai" target="_blank" rel="noopener noreferrer" class="footer-link">GitHub</a>
-        <span class="footer-copy">© 2026 Morgan AI</span>
+
+      <!-- Category tags -->
+      <div class="mb-6 flex gap-2 overflow-x-auto pb-1" style="scrollbar-width:none">
+        <button
+          v-for="cat in categories"
+          :key="cat"
+          @click="activeCategory = cat"
+          class="shrink-0 px-4 py-1.5 rounded-full text-sm font-mono
+                 tracking-wider uppercase transition-all duration-150 border whitespace-nowrap"
+          :class="activeCategory === cat
+            ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
+            : 'bg-transparent border-[var(--border)] text-[var(--fg-subtle)] hover:border-[var(--border-hover)] hover:text-[var(--fg)]'"
+        >{{ cat }}</button>
+      </div>
+
+      <!-- Characters grid -->
+      <div v-if="chat.characters.length > 0"
+           class="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <button
+          v-for="c in chat.characters"
+          :key="c.slug"
+          class="text-left overflow-hidden rounded-[14px] border border-[var(--border)]
+                 bg-[var(--surface)] transition-all duration-200
+                 hover:border-violet-500/30 hover:bg-[var(--surface-2)]
+                 hover:shadow-[0_0_32px_-4px_rgb(124_58_237_/_0.3)]"
+          @click="goToChat"
+        >
+          <!-- Avatar -->
+          <div class="relative h-40 bg-gradient-to-br from-violet-900/50 to-indigo-900/50
+                      flex items-center justify-center overflow-hidden">
+            <img
+              v-if="c.avatar_url"
+              :src="c.avatar_url"
+              :alt="c.name"
+              class="h-full w-full object-cover object-top"
+            />
+            <div
+              v-else
+              class="flex size-20 items-center justify-center rounded-full
+                     bg-gradient-to-br from-violet-600 to-indigo-600
+                     text-3xl font-bold text-white"
+            >{{ c.name[0] }}</div>
+            <div v-if="c.is_premium"
+                 class="absolute top-2 right-2 rounded-full bg-violet-600/80
+                        px-2 py-0.5 text-[10px] font-mono tracking-wider text-white uppercase">
+              ✦ Premium
+            </div>
+          </div>
+          <!-- Info -->
+          <div class="p-3">
+            <div class="mb-1 text-sm font-semibold text-[var(--fg)]">{{ c.name }}</div>
+            <p class="text-xs text-[var(--fg-muted)] line-clamp-2 leading-relaxed">{{ c.description }}</p>
+          </div>
+        </button>
+      </div>
+
+      <!-- Loading skeleton -->
+      <div v-else class="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div v-for="i in 5" :key="i"
+             class="rounded-[14px] border border-[var(--border)] overflow-hidden animate-pulse">
+          <div class="h-40 bg-[var(--surface-2)]" />
+          <div class="p-3 space-y-2">
+            <div class="h-3.5 w-24 rounded bg-[var(--surface-3)]" />
+            <div class="h-3 w-full rounded bg-[var(--surface-3)]" />
+            <div class="h-3 w-3/4 rounded bg-[var(--surface-3)]" />
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA under grid -->
+      <div class="mt-10 text-center">
+        <Button variant="primary" size="lg" @click="goToChat">Начать общение →</Button>
+        <p class="mt-3 text-xs text-[var(--fg-subtle)]">Бесплатно · Без кредитной карты</p>
+      </div>
+    </section>
+
+    <!-- ─── Features ───────────────────────────────────────────────── -->
+    <section id="features" class="border-t border-[var(--border)] py-20">
+      <div class="mx-auto max-w-6xl px-4">
+        <div class="mb-12 text-center">
+          <div class="mb-3 inline-block text-xs font-mono tracking-widest uppercase text-violet-400">
+            Возможности
+          </div>
+          <h2 class="text-3xl font-semibold tracking-[-0.02em] md:text-4xl">Всё для живого общения</h2>
+        </div>
+        <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <Card v-for="f in features" :key="f.title" variant="raised" padding="md">
+            <div class="mb-3 text-3xl">{{ f.icon }}</div>
+            <h3 class="mb-2 text-sm font-semibold text-[var(--fg)]">{{ f.title }}</h3>
+            <p class="text-xs text-[var(--fg-muted)] leading-relaxed">{{ f.desc }}</p>
+          </Card>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Pricing ────────────────────────────────────────────────── -->
+    <section id="pricing" class="border-t border-[var(--border)] py-20">
+      <div class="mx-auto max-w-5xl px-4">
+        <div class="mb-12 text-center">
+          <div class="mb-3 inline-block text-xs font-mono tracking-widest uppercase text-violet-400">
+            Тарифы
+          </div>
+          <h2 class="text-3xl font-semibold tracking-[-0.02em] md:text-4xl">Простые цены</h2>
+        </div>
+        <div class="grid gap-6 md:grid-cols-3">
+          <div
+            v-for="plan in plans"
+            :key="plan.id"
+            class="relative flex flex-col rounded-[14px] border p-6 transition-all duration-200"
+            :class="plan.highlight
+              ? 'border-violet-500/40 bg-violet-500/5 shadow-[0_0_48px_-8px_rgb(124_58_237_/_0.3)]'
+              : 'border-[var(--border)] bg-[var(--surface)]'"
+          >
+            <div v-if="plan.highlight"
+                 class="absolute -top-3 left-1/2 -translate-x-1/2
+                        rounded-full bg-gradient-to-r from-violet-600 to-indigo-600
+                        px-4 py-1 text-[11px] font-semibold text-white whitespace-nowrap
+                        shadow-[0_4px_16px_-4px_rgb(124_58_237_/_0.6)]">
+              Популярный
+            </div>
+            <div class="mb-4">
+              <div class="text-sm font-mono tracking-wider uppercase text-[var(--fg-subtle)]">{{ plan.name }}</div>
+              <div class="mt-2 flex items-end gap-1">
+                <span class="text-4xl font-semibold text-[var(--fg)]">{{ plan.price }}₽</span>
+                <span class="mb-1 text-sm text-[var(--fg-muted)]">{{ plan.period }}</span>
+              </div>
+            </div>
+            <ul class="mb-6 flex-1 space-y-2">
+              <li v-for="feat in plan.features" :key="feat"
+                  class="flex items-center gap-2 text-sm text-[var(--fg-muted)]">
+                <svg class="size-4 shrink-0 text-violet-400" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
+                </svg>
+                {{ feat }}
+              </li>
+            </ul>
+            <Button :variant="plan.highlight ? 'primary' : 'ghost'" size="md" class="w-full" @click="goToChat">
+              {{ plan.cta }}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Footer ────────────────────────────────────────────────── -->
+    <footer class="border-t border-[var(--border)] py-10">
+      <div class="mx-auto max-w-6xl px-4">
+        <div class="flex flex-col items-center justify-between gap-6 sm:flex-row">
+          <div class="flex items-center gap-2.5">
+            <div class="flex size-7 items-center justify-center rounded-[6px]
+                        bg-gradient-to-br from-violet-600 to-indigo-600
+                        text-white text-xs font-bold">M</div>
+            <span class="text-sm font-semibold text-[var(--fg-muted)]">Morgan AI</span>
+          </div>
+          <div class="flex items-center gap-6 text-sm text-[var(--fg-subtle)]">
+            <router-link to="/legal" class="hover:text-[var(--fg)] transition-colors duration-150">Документы</router-link>
+            <router-link to="/pricing" class="hover:text-[var(--fg)] transition-colors duration-150">Тарифы</router-link>
+          </div>
+          <div class="text-xs text-[var(--fg-subtle)] font-mono">
+            © {{ new Date().getFullYear() }} Morgan AI · 18+
+          </div>
+        </div>
       </div>
     </footer>
 
   </div>
 </template>
-
-<style scoped>
-.landing-root {
-  min-height: 100vh;
-  position: relative;
-  z-index: 1;
-}
-
-/* ── NAV ── */
-.landing-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 48px;
-  height: 56px;
-  border-bottom: 1px solid var(--border);
-  background: rgb(9 5 20 / 0.8);
-  backdrop-filter: blur(12px);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-.nav-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-decoration: none;
-}
-.logo-box {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #7c3aed, #6366f1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-ui);
-  font-weight: 700;
-  font-size: 16px;
-  color: #fff;
-  box-shadow: 0 0 16px -4px rgb(124 58 237 / 0.5);
-}
-.logo-box-sm {
-  width: 24px;
-  height: 24px;
-  font-size: 12px;
-  border-radius: var(--radius-sm);
-}
-.logo-text {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 17px;
-  color: var(--fg);
-  letter-spacing: -0.3px;
-}
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.nav-link {
-  font-family: var(--font-ui);
-  font-size: 14px;
-  color: var(--fg-muted);
-  text-decoration: none;
-  padding: 6px 12px;
-  border-radius: var(--radius-md);
-  transition: color 0.2s;
-}
-.nav-link:hover { color: var(--fg); }
-
-/* ── PANELS ── */
-.panels-wrap {
-  padding: 28px 48px 0;
-}
-.panels-grid {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 0.9fr;
-  grid-template-rows: 180px 180px 180px;
-  gap: 12px;
-  height: 580px;
-}
-
-.panel {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-  position: relative;
-  background: var(--surface);
-}
-
-.panel-art {
-  grid-column: 1;
-  grid-row: 1 / span 3;
-}
-.panel-art-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 50% 5%;
-}
-.panel-dialogue {
-  position: absolute;
-  bottom: 14px;
-  left: 14px;
-  right: 14px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-hover);
-  border-radius: var(--radius-lg);
-  padding: 14px 18px 16px;
-  backdrop-filter: blur(8px);
-}
-.panel-dialogue-label {
-  position: absolute;
-  top: -11px;
-  left: 14px;
-  background: linear-gradient(135deg, #7c3aed, #6366f1);
-  color: #fff;
-  padding: 2px 10px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-}
-.panel-dialogue-text {
-  font-family: var(--font-ui);
-  font-style: italic;
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--fg);
-  white-space: pre-line;
-}
-
-.panel-hero {
-  grid-column: 2 / span 2;
-  grid-row: 1 / span 2;
-  padding: 30px 34px;
-  background: var(--surface);
-}
-.panel-chapter-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-}
-.chapter-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex-shrink: 0;
-}
-.panel-heading {
-  font-family: var(--font-ui);
-  font-weight: 700;
-  font-size: clamp(40px, 4.5vw, 68px);
-  line-height: 1.0;
-  letter-spacing: -0.03em;
-  margin-top: 16px;
-  background: linear-gradient(135deg, #c4b5fd 0%, #e879f9 50%, #a5b4fc 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.panel-heading em {
-  font-style: italic;
-}
-.panel-badge {
-  position: absolute;
-  top: 18px;
-  right: 22px;
-  background: rgb(139 92 246 / 0.15);
-  border: 1px solid var(--border-hover);
-  color: var(--accent-soft);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  padding: 3px 8px;
-  letter-spacing: 0.08em;
-}
-
-.panel-voice {
-  grid-column: 2;
-  grid-row: 3;
-  padding: 16px;
-  background: rgb(124 58 237 / 0.10);
-  border-color: rgb(124 58 237 / 0.2);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-.voice-icon-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.voice-icon {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: rgb(139 92 246 / 0.2);
-  border: 1px solid var(--border-hover);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.voice-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--fg-muted);
-}
-.voice-text {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 17px;
-  line-height: 1.2;
-  color: var(--accent-soft);
-}
-
-.panel-memory {
-  grid-column: 3;
-  grid-row: 3;
-  padding: 16px;
-  background: rgb(99 102 241 / 0.10);
-  border-color: rgb(99 102 241 / 0.2);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-.memory-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-}
-.memory-text {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 17px;
-  line-height: 1.2;
-  color: var(--fg-muted);
-}
-
-/* ── CTA BAR ── */
-.cta-bar {
-  padding: 20px 48px 28px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-.cta-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.cta-free-badge {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.free-circle {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 1px solid var(--border-hover);
-  color: var(--accent-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  transform: rotate(-8deg);
-  flex-shrink: 0;
-}
-.cta-free-text {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  color: var(--fg-muted);
-}
-.cta-stats {
-  display: flex;
-  gap: 10px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-subtle);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  flex-wrap: wrap;
-}
-
-/* ── FEATURES ── */
-.features-section {
-  padding: 48px;
-  border-top: 1px solid var(--border);
-}
-.features-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-  margin-bottom: 24px;
-}
-.features-label-num {
-  color: var(--accent-soft);
-}
-.features-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1px;
-  background: var(--border);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-}
-.feature-card {
-  padding: 28px 24px;
-  background: var(--surface);
-  cursor: default;
-}
-.feature-icon {
-  font-size: 24px;
-  margin-bottom: 12px;
-}
-.feature-title {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--fg);
-  margin-bottom: 8px;
-}
-.feature-desc {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  color: var(--fg-muted);
-  line-height: 1.55;
-}
-
-/* ── FOOTER ── */
-.landing-footer {
-  border-top: 1px solid var(--border);
-  padding: 20px 48px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.footer-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.footer-brand-name {
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 15px;
-  color: var(--fg-muted);
-}
-.footer-links {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.footer-link {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-  text-decoration: none;
-  transition: color 0.2s;
-}
-.footer-link:hover { color: var(--fg-muted); }
-.footer-copy {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--fg-subtle);
-  letter-spacing: 0.05em;
-}
-
-/* ── MOBILE ── */
-@media (max-width: 768px) {
-  .landing-nav { padding: 0 16px; }
-  .nav-link { display: none; }
-  .panels-wrap { padding: 16px 16px 0; }
-  .panels-grid {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto;
-    height: auto;
-    gap: 8px;
-  }
-  .panel-art {
-    grid-column: 1 / span 2;
-    grid-row: auto;
-    height: 300px;
-  }
-  .panel-hero {
-    grid-column: 1 / span 2;
-    grid-row: auto;
-    padding: 22px 20px;
-    height: auto;
-  }
-  .panel-voice { grid-column: 1; grid-row: auto; min-height: 100px; }
-  .panel-memory { grid-column: 2; grid-row: auto; min-height: 100px; }
-  .cta-bar { padding: 16px 16px 20px; }
-  .features-section { padding: 32px 16px; }
-  .landing-footer { padding: 20px 16px; }
-}
-
-@media (max-width: 480px) {
-  .panel-heading { font-size: 32px; }
-  .panel-art { height: 260px; }
-}
-</style>
