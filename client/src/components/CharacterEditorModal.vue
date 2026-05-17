@@ -26,6 +26,7 @@ const systemPrompt    = ref('')
 const greetingMessage = ref('')
 const avatarUrl       = ref('')
 const isPublic        = ref(false)
+const isNsfw          = ref(false)
 
 const loading = ref(false)
 const error   = ref('')
@@ -40,6 +41,7 @@ watch(() => props.visible, (val) => {
     greetingMessage.value = props.character.greeting_message || ''
     avatarUrl.value       = props.character.avatar_url || ''
     isPublic.value        = props.character.is_public
+    isNsfw.value          = props.character.is_nsfw ?? false
   } else {
     name.value            = ''
     description.value     = ''
@@ -47,6 +49,7 @@ watch(() => props.visible, (val) => {
     greetingMessage.value = ''
     avatarUrl.value       = ''
     isPublic.value        = false
+    isNsfw.value          = false
   }
 }, { immediate: true })
 
@@ -63,6 +66,7 @@ async function save() {
       greeting_message: greetingMessage.value.trim() || undefined,
       avatar_url:       avatarUrl.value.trim() || undefined,
       is_public:        isPublic.value,
+      is_nsfw:          isNsfw.value,
     }
     const char = props.character
       ? await chat.updateUserCharacter(props.character.id, data)
@@ -160,6 +164,22 @@ async function remove() {
         hint="Необязательно — прямая ссылка на изображение"
       />
 
+      <!-- Moderation status banner -->
+      <div v-if="character?.moderation_status === 'pending'"
+           class="flex items-start gap-2 px-3 py-2.5 rounded-[8px]
+                  bg-amber-500/10 border border-amber-500/30 text-sm text-amber-400">
+        <svg class="size-4 shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        На модерации — ждите проверки
+      </div>
+      <div v-else-if="character?.moderation_status === 'rejected'"
+           class="flex flex-col gap-1 px-3 py-2.5 rounded-[8px]
+                  bg-red-500/10 border border-red-500/30 text-sm text-red-400">
+        <span>Персонаж отклонён</span>
+        <span v-if="character.rejection_reason" class="text-xs opacity-80">{{ character.rejection_reason }}</span>
+      </div>
+
       <!-- Public toggle -->
       <label class="flex items-start gap-3 cursor-pointer group">
         <input
@@ -171,7 +191,23 @@ async function remove() {
         <div>
           <span class="text-sm text-[var(--fg)]">Публичный персонаж</span>
           <p class="text-xs text-[var(--fg-subtle)] mt-0.5">
-            Виден другим пользователям в разделе «Сообщество»
+            Виден другим пользователям. Будет отправлен на модерацию.
+          </p>
+        </div>
+      </label>
+
+      <!-- NSFW toggle -->
+      <label class="flex items-start gap-3 cursor-pointer group">
+        <input
+          type="checkbox"
+          v-model="isNsfw"
+          class="mt-0.5 size-4 rounded border-[var(--border)] bg-[var(--surface)]
+                 accent-violet-500 cursor-pointer"
+        />
+        <div>
+          <span class="text-sm text-[var(--fg)]">NSFW-контент</span>
+          <p class="text-xs text-[var(--fg-subtle)] mt-0.5">
+            18+ — персонаж будет скрыт от пользователей без NSFW-доступа
           </p>
         </div>
       </label>

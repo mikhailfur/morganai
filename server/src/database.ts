@@ -175,6 +175,114 @@ class Database {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
 
+      // New user columns
+      await this.addColumnIfNotExists('users', 'is_support', 'BOOLEAN DEFAULT FALSE');
+
+      // New user_characters columns (moderation)
+      await this.addColumnIfNotExists('user_characters', 'moderation_status', "ENUM('pending','approved','rejected') DEFAULT 'pending'");
+      await this.addColumnIfNotExists('user_characters', 'is_nsfw', 'BOOLEAN DEFAULT FALSE');
+      await this.addColumnIfNotExists('user_characters', 'rejection_reason', 'TEXT NULL');
+      await this.addColumnIfNotExists('user_characters', 'reviewed_by', 'INT NULL');
+      await this.addColumnIfNotExists('user_characters', 'reviewed_at', 'BIGINT NULL');
+      try {
+        await this.pool.execute('ALTER TABLE user_characters ADD INDEX idx_mod_status (moderation_status)');
+      } catch (err: any) { if (err.errno !== 1061) throw err; }
+
+      // Approve existing public user characters (migration for existing data)
+      await this.pool.execute(
+        "UPDATE user_characters SET moderation_status = 'approved' WHERE is_public = 1 AND moderation_status = 'pending'"
+      );
+
+      // Support tickets
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS support_tickets (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          subject VARCHAR(500) NOT NULL,
+          status ENUM('open','in_progress','closed') DEFAULT 'open',
+          created_at BIGINT NOT NULL,
+          updated_at BIGINT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          INDEX idx_user_id (user_id),
+          INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS ticket_messages (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          ticket_id INT NOT NULL,
+          sender_id INT NOT NULL,
+          sender_role ENUM('user','support') NOT NULL,
+          content TEXT NOT NULL,
+          created_at BIGINT NOT NULL,
+          FOREIGN KEY (ticket_id) REFERENCES support_tickets(id) ON DELETE CASCADE,
+          FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+          INDEX idx_ticket_id (ticket_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      // Per-character module settings
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS user_character_settings (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          character_slug VARCHAR(100) NOT NULL,
+          active_module_id VARCHAR(100) NULL,
+          updated_at BIGINT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE KEY uq_user_char (user_id, character_slug),
+          INDEX idx_user_id (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      // Campaigns
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS campaigns (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          character_slug VARCHAR(100) NOT NULL,
+          title VARCHAR(500) NOT NULL,
+          description TEXT,
+          cover_url VARCHAR(500) DEFAULT NULL,
+          is_active BOOLEAN DEFAULT 1,
+          sort_order INT DEFAULT 0,
+          created_at BIGINT NOT NULL,
+          INDEX idx_character (character_slug),
+          INDEX idx_active (is_active)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS campaign_scenes (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          campaign_id INT NOT NULL,
+          scene_order INT NOT NULL,
+          title VARCHAR(500) NOT NULL,
+          location VARCHAR(500) DEFAULT NULL,
+          situation TEXT,
+          context_prompt TEXT NOT NULL,
+          FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+          INDEX idx_campaign_order (campaign_id, scene_order)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS user_campaign_progress (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          campaign_id INT NOT NULL,
+          current_scene_id INT NOT NULL,
+          is_completed BOOLEAN DEFAULT 0,
+          started_at BIGINT NOT NULL,
+          updated_at BIGINT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+          FOREIGN KEY (current_scene_id) REFERENCES campaign_scenes(id),
+          UNIQUE KEY uq_user_campaign (user_id, campaign_id),
+          INDEX idx_user_id (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+
       // Seed plan limits defaults
       await this.pool.execute(`
         INSERT IGNORE INTO plan_limits (plan_type, daily_message_limit, context_messages, context_chars, voice_limit, voice_window_hours, updated_at)
@@ -299,9 +407,13 @@ class Database {
     await this.pool.execute('DELETE FROM users WHERE id = ?', [userId]);
   }
 
+  async setUserSupport(userId: number, isSupport: boolean): Promise<void> {
+    await this.pool.execute('UPDATE users SET is_support = ? WHERE id = ?', [isSupport ? 1 : 0, userId]);
+  }
+
   async getAllUsers(): Promise<any[]> {
     const [rows] = await this.pool.execute(
-      'SELECT id, email, username, is_premium, is_admin, is_banned, kyc_verified, subscription_type, subscription_expires_at, behavior_mode, selected_character, total_messages, created_at, last_active FROM users ORDER BY last_active DESC'
+      'SELECT id, email, username, is_premium, is_admin, is_support, is_banned, kyc_verified, subscription_type, subscription_expires_at, behavior_mode, selected_character, total_messages, created_at, last_active FROM users ORDER BY last_active DESC'
     );
     return rows as any[];
   }
@@ -433,11 +545,12 @@ class Database {
 
   async createUserCharacter(userId: number, data: {
     name: string; description?: string; system_prompt: string;
-    greeting_message?: string; avatar_url?: string; is_public?: boolean;
+    greeting_message?: string; avatar_url?: string; is_public?: boolean; is_nsfw?: boolean;
   }): Promise<number> {
+    const moderationStatus = data.is_public ? 'pending' : 'approved';
     const [result] = await this.pool.execute(
-      `INSERT INTO user_characters (user_id, name, description, system_prompt, greeting_message, avatar_url, is_public, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, data.name, data.description || null, data.system_prompt, data.greeting_message || null, data.avatar_url || null, data.is_public ? 1 : 0, Date.now()]
+      `INSERT INTO user_characters (user_id, name, description, system_prompt, greeting_message, avatar_url, is_public, is_nsfw, moderation_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, data.name, data.description || null, data.system_prompt, data.greeting_message || null, data.avatar_url || null, data.is_public ? 1 : 0, data.is_nsfw ? 1 : 0, moderationStatus, Date.now()]
     );
     return (result as any).insertId;
   }
@@ -450,11 +563,34 @@ class Database {
     return rows as any[];
   }
 
-  async getPublicUserCharacters(): Promise<any[]> {
+  async getPublicUserCharacters(includeNsfw: boolean = false): Promise<any[]> {
+    const nsfwFilter = includeNsfw ? '' : ' AND uc.is_nsfw = 0';
     const [rows] = await this.pool.execute(
-      'SELECT uc.*, u.username as author_name FROM user_characters uc JOIN users u ON uc.user_id = u.id WHERE uc.is_public = 1 ORDER BY uc.sort_order, uc.created_at DESC LIMIT 100'
+      `SELECT uc.*, u.username as author_name FROM user_characters uc JOIN users u ON uc.user_id = u.id WHERE uc.is_public = 1 AND uc.moderation_status = 'approved'${nsfwFilter} ORDER BY uc.sort_order, uc.created_at DESC LIMIT 100`
     );
     return rows as any[];
+  }
+
+  async getCharactersForModeration(status?: string, page: number = 0): Promise<any[]> {
+    const limit = 20;
+    const offset = page * limit;
+    const statusFilter = status ? ` AND uc.moderation_status = '${status}'` : '';
+    const [rows] = await this.pool.execute(
+      `SELECT uc.*, u.username as author_name FROM user_characters uc JOIN users u ON uc.user_id = u.id WHERE 1=1${statusFilter} ORDER BY uc.created_at DESC LIMIT ${limit} OFFSET ${offset}`
+    );
+    return rows as any[];
+  }
+
+  async moderateUserCharacter(id: number, status: 'approved' | 'rejected', reviewedBy: number, rejectionReason?: string): Promise<void> {
+    const now = Date.now();
+    await this.pool.execute(
+      `UPDATE user_characters SET moderation_status = ?, rejection_reason = ?, reviewed_by = ?, reviewed_at = ?${status === 'rejected' ? ', is_public = 0' : ''} WHERE id = ?`,
+      [status, rejectionReason || null, reviewedBy, now, id]
+    );
+  }
+
+  async setUserCharacterNsfw(id: number, isNsfw: boolean): Promise<void> {
+    await this.pool.execute('UPDATE user_characters SET is_nsfw = ? WHERE id = ?', [isNsfw ? 1 : 0, id]);
   }
 
   async getUserCharacterById(id: number, userId?: number): Promise<any> {
@@ -469,6 +605,7 @@ class Database {
   async updateUserCharacter(id: number, userId: number, data: {
     name?: string; description?: string; system_prompt?: string;
     greeting_message?: string; avatar_url?: string; is_public?: boolean;
+    is_nsfw?: boolean; moderation_status?: string;
   }): Promise<void> {
     const sets: string[] = [];
     const vals: any[] = [];
@@ -478,6 +615,8 @@ class Database {
     if (data.greeting_message !== undefined) { sets.push('greeting_message = ?'); vals.push(data.greeting_message || null); }
     if (data.avatar_url !== undefined) { sets.push('avatar_url = ?'); vals.push(data.avatar_url || null); }
     if (data.is_public !== undefined) { sets.push('is_public = ?'); vals.push(data.is_public ? 1 : 0); }
+    if (data.is_nsfw !== undefined) { sets.push('is_nsfw = ?'); vals.push(data.is_nsfw ? 1 : 0); }
+    if (data.moderation_status !== undefined) { sets.push('moderation_status = ?'); vals.push(data.moderation_status); }
     if (sets.length === 0) return;
     vals.push(id, userId);
     await this.pool.execute(`UPDATE user_characters SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`, vals);
@@ -562,6 +701,211 @@ class Database {
     const expiry = user.subscription_expires_at || user.subscription_until;
     if (expiry && expiry < Date.now()) return 'free';
     return user.subscription_type || 'premium';
+  }
+
+  // === Support tickets ===
+
+  async createTicket(userId: number, subject: string): Promise<number> {
+    const now = Date.now();
+    const [result] = await this.pool.execute(
+      'INSERT INTO support_tickets (user_id, subject, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+      [userId, subject, 'open', now, now]
+    );
+    return (result as any).insertId;
+  }
+
+  async getTicketsByUser(userId: number): Promise<any[]> {
+    const [rows] = await this.pool.execute(
+      `SELECT t.*, (SELECT content FROM ticket_messages WHERE ticket_id = t.id ORDER BY created_at DESC LIMIT 1) as last_message
+       FROM support_tickets t WHERE t.user_id = ? ORDER BY t.updated_at DESC`,
+      [userId]
+    );
+    return rows as any[];
+  }
+
+  async getAllTickets(status?: string, page: number = 0): Promise<any[]> {
+    const limit = 20;
+    const offset = page * limit;
+    const statusFilter = status ? ` AND t.status = '${status}'` : '';
+    const [rows] = await this.pool.execute(
+      `SELECT t.*, u.email as user_email, u.username as user_name
+       FROM support_tickets t JOIN users u ON t.user_id = u.id
+       WHERE 1=1${statusFilter}
+       ORDER BY t.updated_at DESC LIMIT ${limit} OFFSET ${offset}`
+    );
+    return rows as any[];
+  }
+
+  async getTicketWithMessages(ticketId: number): Promise<any> {
+    const [tRows] = await this.pool.execute(
+      'SELECT t.*, u.email as user_email, u.username as user_name FROM support_tickets t JOIN users u ON t.user_id = u.id WHERE t.id = ?',
+      [ticketId]
+    );
+    const ticket = (tRows as any[])[0];
+    if (!ticket) return null;
+    const [mRows] = await this.pool.execute(
+      `SELECT m.*, u.username as sender_name FROM ticket_messages m JOIN users u ON m.sender_id = u.id WHERE m.ticket_id = ? ORDER BY m.created_at ASC`,
+      [ticketId]
+    );
+    ticket.messages = mRows as any[];
+    return ticket;
+  }
+
+  async updateTicketStatus(id: number, status: string): Promise<void> {
+    await this.pool.execute(
+      'UPDATE support_tickets SET status = ?, updated_at = ? WHERE id = ?',
+      [status, Date.now(), id]
+    );
+  }
+
+  async addTicketMessage(ticketId: number, senderId: number, senderRole: 'user' | 'support', content: string): Promise<number> {
+    const now = Date.now();
+    const [result] = await this.pool.execute(
+      'INSERT INTO ticket_messages (ticket_id, sender_id, sender_role, content, created_at) VALUES (?, ?, ?, ?, ?)',
+      [ticketId, senderId, senderRole, content, now]
+    );
+    await this.pool.execute('UPDATE support_tickets SET updated_at = ? WHERE id = ?', [now, ticketId]);
+    return (result as any).insertId;
+  }
+
+  // === User character settings (per-character module) ===
+
+  async getUserCharacterModule(userId: number, characterSlug: string): Promise<string | null> {
+    const [rows] = await this.pool.execute(
+      'SELECT active_module_id FROM user_character_settings WHERE user_id = ? AND character_slug = ?',
+      [userId, characterSlug]
+    );
+    return (rows as any[])[0]?.active_module_id || null;
+  }
+
+  async setUserCharacterModule(userId: number, characterSlug: string, moduleId: string): Promise<void> {
+    await this.pool.execute(
+      `INSERT INTO user_character_settings (user_id, character_slug, active_module_id, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE active_module_id = VALUES(active_module_id), updated_at = VALUES(updated_at)`,
+      [userId, characterSlug, moduleId, Date.now()]
+    );
+  }
+
+  // === Campaigns ===
+
+  async getCampaigns(userId: number, characterSlug?: string): Promise<any[]> {
+    const slugFilter = characterSlug ? ' AND c.character_slug = ?' : '';
+    const params: any[] = characterSlug ? [userId, characterSlug] : [userId];
+    const [rows] = await this.pool.execute(
+      `SELECT c.*,
+        (SELECT COUNT(*) FROM campaign_scenes WHERE campaign_id = c.id) as scene_count,
+        p.current_scene_id, p.is_completed, p.started_at as progress_started_at
+       FROM campaigns c
+       LEFT JOIN user_campaign_progress p ON p.campaign_id = c.id AND p.user_id = ?
+       WHERE c.is_active = 1${slugFilter}
+       ORDER BY c.sort_order ASC`,
+      params
+    );
+    return rows as any[];
+  }
+
+  async getCampaignById(id: number): Promise<any> {
+    const [cRows] = await this.pool.execute('SELECT * FROM campaigns WHERE id = ?', [id]);
+    const campaign = (cRows as any[])[0];
+    if (!campaign) return null;
+    const [sRows] = await this.pool.execute(
+      'SELECT * FROM campaign_scenes WHERE campaign_id = ? ORDER BY scene_order ASC',
+      [id]
+    );
+    campaign.scenes = sRows as any[];
+    return campaign;
+  }
+
+  async getCampaignSceneById(sceneId: number): Promise<any> {
+    const [rows] = await this.pool.execute(
+      'SELECT cs.*, c.title as campaign_title, c.character_slug FROM campaign_scenes cs JOIN campaigns c ON cs.campaign_id = c.id WHERE cs.id = ?',
+      [sceneId]
+    );
+    return (rows as any[])[0] || null;
+  }
+
+  async getUserCampaignProgress(userId: number, campaignId: number): Promise<any> {
+    const [rows] = await this.pool.execute(
+      'SELECT * FROM user_campaign_progress WHERE user_id = ? AND campaign_id = ?',
+      [userId, campaignId]
+    );
+    return (rows as any[])[0] || null;
+  }
+
+  async startCampaign(userId: number, campaignId: number, firstSceneId: number): Promise<void> {
+    const now = Date.now();
+    await this.pool.execute(
+      `INSERT INTO user_campaign_progress (user_id, campaign_id, current_scene_id, is_completed, started_at, updated_at)
+       VALUES (?, ?, ?, 0, ?, ?)
+       ON DUPLICATE KEY UPDATE current_scene_id = VALUES(current_scene_id), is_completed = 0, updated_at = VALUES(updated_at)`,
+      [userId, campaignId, firstSceneId, now, now]
+    );
+  }
+
+  async updateCampaignProgress(userId: number, campaignId: number, currentSceneId: number, isCompleted: boolean = false): Promise<void> {
+    await this.pool.execute(
+      'UPDATE user_campaign_progress SET current_scene_id = ?, is_completed = ?, updated_at = ? WHERE user_id = ? AND campaign_id = ?',
+      [currentSceneId, isCompleted ? 1 : 0, Date.now(), userId, campaignId]
+    );
+  }
+
+  // Admin campaign CRUD
+  async createCampaign(data: { character_slug: string; title: string; description?: string; cover_url?: string; sort_order?: number }): Promise<number> {
+    const [result] = await this.pool.execute(
+      'INSERT INTO campaigns (character_slug, title, description, cover_url, is_active, sort_order, created_at) VALUES (?, ?, ?, ?, 1, ?, ?)',
+      [data.character_slug, data.title, data.description || null, data.cover_url || null, data.sort_order || 0, Date.now()]
+    );
+    return (result as any).insertId;
+  }
+
+  async updateCampaign(id: number, data: Partial<{ title: string; description: string; cover_url: string; is_active: boolean; sort_order: number }>): Promise<void> {
+    const sets: string[] = [];
+    const vals: any[] = [];
+    if (data.title !== undefined) { sets.push('title = ?'); vals.push(data.title); }
+    if (data.description !== undefined) { sets.push('description = ?'); vals.push(data.description || null); }
+    if (data.cover_url !== undefined) { sets.push('cover_url = ?'); vals.push(data.cover_url || null); }
+    if (data.is_active !== undefined) { sets.push('is_active = ?'); vals.push(data.is_active ? 1 : 0); }
+    if (data.sort_order !== undefined) { sets.push('sort_order = ?'); vals.push(data.sort_order); }
+    if (sets.length === 0) return;
+    vals.push(id);
+    await this.pool.execute(`UPDATE campaigns SET ${sets.join(', ')} WHERE id = ?`, vals);
+  }
+
+  async deleteCampaign(id: number): Promise<void> {
+    await this.pool.execute('DELETE FROM campaigns WHERE id = ?', [id]);
+  }
+
+  async createCampaignScene(data: { campaign_id: number; scene_order: number; title: string; location?: string; situation?: string; context_prompt: string }): Promise<number> {
+    const [result] = await this.pool.execute(
+      'INSERT INTO campaign_scenes (campaign_id, scene_order, title, location, situation, context_prompt) VALUES (?, ?, ?, ?, ?, ?)',
+      [data.campaign_id, data.scene_order, data.title, data.location || null, data.situation || null, data.context_prompt]
+    );
+    return (result as any).insertId;
+  }
+
+  async updateCampaignScene(id: number, data: Partial<{ scene_order: number; title: string; location: string; situation: string; context_prompt: string }>): Promise<void> {
+    const sets: string[] = [];
+    const vals: any[] = [];
+    if (data.scene_order !== undefined) { sets.push('scene_order = ?'); vals.push(data.scene_order); }
+    if (data.title !== undefined) { sets.push('title = ?'); vals.push(data.title); }
+    if (data.location !== undefined) { sets.push('location = ?'); vals.push(data.location || null); }
+    if (data.situation !== undefined) { sets.push('situation = ?'); vals.push(data.situation || null); }
+    if (data.context_prompt !== undefined) { sets.push('context_prompt = ?'); vals.push(data.context_prompt); }
+    if (sets.length === 0) return;
+    vals.push(id);
+    await this.pool.execute(`UPDATE campaign_scenes SET ${sets.join(', ')} WHERE id = ?`, vals);
+  }
+
+  async deleteCampaignScene(id: number): Promise<void> {
+    await this.pool.execute('DELETE FROM campaign_scenes WHERE id = ?', [id]);
+  }
+
+  async getAllCampaigns(): Promise<any[]> {
+    const [rows] = await this.pool.execute(
+      `SELECT c.*, (SELECT COUNT(*) FROM campaign_scenes WHERE campaign_id = c.id) as scene_count FROM campaigns c ORDER BY c.sort_order ASC`
+    );
+    return rows as any[];
   }
 }
 

@@ -13,6 +13,8 @@ import imageRoutes from './routes/image.routes';
 import voiceRoutes from './routes/voice.routes';
 import userRoutes from './routes/user.routes';
 import adminRoutes from './routes/admin.routes';
+import supportRoutes from './routes/support.routes';
+import campaignRoutes from './routes/campaigns.routes';
 import { kycProtectedRouter, kycWebhookRouter } from './routes/kyc.routes';
 
 const app = express();
@@ -39,6 +41,8 @@ app.use('/api/voice', authMiddleware, voiceRoutes);
 app.use('/api/user', authMiddleware, userRoutes);
 app.use('/api/kyc', authMiddleware, kycProtectedRouter);  // /session
 app.use('/api/admin', authMiddleware, adminMiddleware, adminRoutes);
+app.use('/api/support', authMiddleware, supportRoutes);
+app.use('/api/campaigns', authMiddleware, campaignRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

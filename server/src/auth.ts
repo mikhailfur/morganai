@@ -88,3 +88,22 @@ export const adminMiddleware = async (req: AuthenticatedRequest, res: Response, 
     res.status(403).json({ error: 'Доступ запрещён' });
   }
 };
+
+export const supportMiddleware = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Необходима авторизация' });
+      return;
+    }
+
+    const user = await database.getUserById(req.user.userId);
+    if (!user || (!user.is_admin && !user.is_support)) {
+      res.status(403).json({ error: 'Доступ запрещён' });
+      return;
+    }
+
+    next();
+  } catch (error) {
+    res.status(403).json({ error: 'Доступ запрещён' });
+  }
+};

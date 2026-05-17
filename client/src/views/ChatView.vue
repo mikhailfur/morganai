@@ -33,7 +33,7 @@ const messageInput        = ref('')
 const messagesContainer   = ref<HTMLElement | null>(null)
 const fileInput           = ref<HTMLInputElement | null>(null)
 const isRecording         = ref(false)
-const showModes           = ref(false)
+const showNsfwBlockedPopup = ref(false)
 const showCharacterPicker = ref(false)
 const showCreateChar      = ref(false)
 const editingChar         = ref<UserCharacter | null>(null)
@@ -81,18 +81,31 @@ const suggestions = [
   { icon: '🔮', text: 'Есть секрет, которым хочешь поделиться?' },
 ]
 
-// ── Modes ──────────────────────────────────────────────────────────────────
-const modes = [
-  { id: 'default',      name: 'Обычный',    desc: 'Стандартный ролевой режим.' },
-  { id: 'study',        name: 'Учёба',       desc: 'Репетитор. Помогает с заданиями.' },
-  { id: 'work',         name: 'Работа',      desc: 'Деловой помощник.' },
-  { id: 'psychologist', name: 'Психолог',    desc: 'Эмоциональная поддержка.' },
-  { id: 'nsfw',         name: 'NSFW · 18+',  desc: 'Без фильтра. Premium или верификация.', restricted: true },
-]
-const composerModes  = modes.filter(m => m.id !== 'nsfw')
-const currentMode    = computed(() => modes.find(m => m.id === auth.user?.behavior_mode) || modes[0])
-const nsfwGeoBlocked = ref(false)
-const modeError      = ref('')
+// ── Modules (per-character) ────────────────────────────────────────────────
+const currentCharModules = computed(() => {
+  if (currentCharacter.value.startsWith('uc:')) return []
+  const char = currentCharObj.value as any
+  if (!char?.modules?.length) return []
+  return char.modules.filter((m: any) => !m.isNsfw || auth.canNsfw)
+})
+
+const activeModuleId = computed(() => chat.characterModules[currentCharacter.value] ?? null)
+
+async function setModule(moduleId: string) {
+  const slug = currentCharacter.value
+  if (slug.startsWith('uc:')) return
+  try { await chat.setCharacterModule(slug, moduleId) } catch { /* */ }
+}
+
+watch(() => chat.nsfwBlocked, (blocked) => {
+  if (blocked) {
+    showNsfwBlockedPopup.value = true
+    setTimeout(() => {
+      showNsfwBlockedPopup.value = false
+      chat.nsfwBlocked = false
+    }, 6000)
+  }
+})
 
 // ── Init ───────────────────────────────────────────────────────────────────
 onMounted(async () => {
@@ -104,6 +117,7 @@ onMounted(async () => {
     chat.fetchPublicCharacters(),
   ])
   await chat.fetchHistory(currentCharacter.value)
+  if (!currentCharacter.value.startsWith('uc:')) await chat.fetchCharacterModule(currentCharacter.value)
   nextTick(scrollToBottom)
 })
 
@@ -179,6 +193,7 @@ async function setMode(modeId: string) {
 async function switchCharacter(slug: string) {
   await auth.updateSettings({ selected_character: slug })
   await chat.fetchHistory(slug)
+  if (!slug.startsWith('uc:')) await chat.fetchCharacterModule(slug)
   showCharacterPicker.value = false
   mobileView.value = 'chat'
 }
@@ -451,6 +466,16 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
                 <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
               </svg>
             </router-link>
+            <router-link to="/support"
+              class="flex size-7 items-center justify-center rounded-[6px]
+                     text-[var(--fg-subtle)] hover:text-violet-400 hover:bg-violet-500/10
+                     transition-colors duration-150"
+              title="Поддержка"
+            >
+              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+              </svg>
+            </router-link>
             <router-link to="/pricing"
               class="flex size-7 items-center justify-center rounded-[6px]
                      text-[var(--fg-subtle)] hover:text-violet-400 hover:bg-violet-500/10
@@ -517,23 +542,27 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
           <div class="text-sm font-semibold text-[var(--fg)] leading-tight">{{ charName }}</div>
           <div class="flex items-center gap-1.5 text-[11px] text-[var(--fg-subtle)]">
             <span class="text-emerald-400">●</span>
-            онлайн · {{ currentMode.name }}
+            <span v-if="chat.activeCampaign" class="text-violet-400">
+              {{ chat.activeCampaign.title }}
+            </span>
+            <span v-else>онлайн</span>
           </div>
         </div>
 
-        <!-- Mode button -->
-        <button
-          @click="showModes = true"
-          class="flex items-center gap-1.5 rounded-[8px] border border-[var(--border)]
-                 px-2.5 py-1.5 text-xs text-[var(--fg-muted)]
-                 hover:border-violet-500/30 hover:text-[var(--fg)] hover:bg-[var(--surface-2)]
-                 transition-all duration-150 shrink-0"
-        >
-          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
-          </svg>
-          <span class="hidden sm:inline">Режим</span>
-        </button>
+        <!-- Module selector (canonical chars only) -->
+        <div v-if="currentCharModules.length > 1"
+             class="flex items-center gap-1 shrink-0 overflow-x-auto max-w-[240px]"
+             style="scrollbar-width:none">
+          <button
+            v-for="m in currentCharModules" :key="m.id"
+            @click="setModule(m.id)"
+            class="shrink-0 rounded-[6px] px-2.5 py-1 text-[11px] font-mono tracking-wider
+                   uppercase transition-all duration-150 border whitespace-nowrap"
+            :class="(activeModuleId || 'default') === m.id
+              ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
+              : 'border-[var(--border)] text-[var(--fg-subtle)] hover:text-[var(--fg)]'"
+          >{{ m.name }}</button>
+        </div>
 
         <!-- Plan badge -->
         <div class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-mono tracking-wider uppercase"
@@ -648,27 +677,6 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
       <!-- ── Composer ── -->
       <div class="shrink-0 border-t border-violet-500/10 bg-[#090514]/80 backdrop-blur-md p-3">
 
-        <!-- Mode tabs -->
-        <div class="mb-2 flex gap-1 overflow-x-auto pb-0.5" style="scrollbar-width:none">
-          <button
-            v-for="m in composerModes" :key="m.id"
-            @click="setMode(m.id)"
-            class="shrink-0 rounded-[6px] px-2.5 py-1 text-[11px] font-mono tracking-wider
-                   uppercase transition-all duration-150 border whitespace-nowrap"
-            :class="auth.user?.behavior_mode === m.id
-              ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-              : 'border-[var(--border)] text-[var(--fg-subtle)] hover:text-[var(--fg)]'"
-          >{{ m.name }}</button>
-          <button
-            @click="showModes = true"
-            class="shrink-0 rounded-[6px] px-2.5 py-1 text-[11px] font-mono tracking-wider
-                   uppercase transition-all duration-150 border whitespace-nowrap"
-            :class="auth.user?.behavior_mode === 'nsfw'
-              ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-              : 'border-[var(--border)] text-[var(--fg-subtle)] opacity-60 hover:opacity-100'"
-          >NSFW</button>
-        </div>
-
         <!-- Input row -->
         <div class="flex items-end gap-2 rounded-[14px] border border-violet-500/10
                     bg-[#120d24] px-3 py-2
@@ -739,32 +747,35 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
          MODALS
     ═══════════════════════════════════ -->
 
-    <Modal :open="showModes" title="Режим поведения" size="sm"
-           @update:open="val => !val && (showModes = false)" @close="showModes = false">
-      <div class="flex flex-col gap-2.5">
-        <div v-if="modeError"
-             class="rounded-[8px] bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400">
-          {{ modeError }}
+    <!-- NSFW blocked popup -->
+    <Transition name="slide-up">
+      <div v-if="showNsfwBlockedPopup"
+           class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50
+                  flex items-start gap-3
+                  bg-[#1a0f2e] border border-violet-500/30 rounded-[16px]
+                  px-4 py-3 shadow-[0_16px_48px_-8px_rgb(0_0_0_/_0.6)]
+                  max-w-sm w-[calc(100%-2rem)]">
+        <div class="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-red-500/15 text-red-400">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
         </div>
-        <div v-for="m in modes" :key="m.id"
-             @click="m.restricted && !auth.canNsfw ? undefined : setMode(m.id)"
-             class="flex flex-col gap-1 rounded-[10px] border p-3 transition-all duration-150"
-             :class="[
-               auth.user?.behavior_mode === m.id
-                 ? 'bg-violet-500/15 border-violet-500/40'
-                 : 'border-[var(--border)] hover:border-violet-500/20 hover:bg-[var(--surface-2)]',
-               m.restricted && !auth.canNsfw ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
-             ]">
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-[var(--fg)]">{{ m.name }}</span>
-            <span v-if="auth.user?.behavior_mode === m.id" class="text-[10px] text-violet-400">● активен</span>
-            <span v-else-if="m.restricted && !auth.canNsfw" class="text-[10px] text-[var(--fg-subtle)]">✦ Premium</span>
-          </div>
-          <p class="text-xs text-[var(--fg-muted)]">{{ m.desc }}</p>
-          <p v-if="m.restricted && nsfwGeoBlocked" class="text-xs text-red-400">✖ Недоступно в регионе</p>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-[var(--fg)]">NSFW заблокирован</p>
+          <p class="text-xs text-[var(--fg-muted)] mt-0.5">
+            Включите NSFW-режим в настройках.
+            <router-link to="/settings" class="text-violet-400 hover:underline ml-1">Настройки</router-link>
+            <router-link to="/pricing" class="text-violet-400 hover:underline ml-2">Premium</router-link>
+          </p>
         </div>
+        <button @click="showNsfwBlockedPopup = false; chat.nsfwBlocked = false"
+                class="text-[var(--fg-subtle)] hover:text-[var(--fg)] transition-colors">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
       </div>
-    </Modal>
+    </Transition>
 
     <CharacterPickerModal
       :visible="showCharacterPicker" :current-slug="currentCharacter"
@@ -778,3 +789,8 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
 
   </div>
 </template>
+
+<style scoped>
+.slide-up-enter-active, .slide-up-leave-active { transition: all 0.25s ease; }
+.slide-up-enter-from, .slide-up-leave-to { opacity: 0; transform: translate(-50%, 12px); }
+</style>

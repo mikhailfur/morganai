@@ -22,32 +22,25 @@ const tabs = [
 const activeTab = ref('profile')
 
 // ─── Modes ────────────────────────────────────────────────────────────────
-const modes = [
-  { id: 'default',      name: 'Обычный',    desc: 'Стандартный ролевой режим.' },
-  { id: 'study',        name: 'Учёба',       desc: 'Репетитор. Помогает с заданиями.' },
-  { id: 'work',         name: 'Работа',      desc: 'Деловой помощник.' },
-  { id: 'psychologist', name: 'Психолог',    desc: 'Эмоциональная поддержка.' },
-  { id: 'nsfw',         name: 'NSFW · 18+',  desc: 'Без фильтра. Требуется Premium или верификация.', restricted: true },
-]
-const modeError      = ref('')
+const nsfwError      = ref('')
 const nsfwGeoBlocked = ref(false)
 
-async function setMode(mode: string) {
-  const m = modes.find(m => m.id === mode)
-  if (m?.restricted && !auth.canNsfw) {
-    modeError.value = 'NSFW доступен с Premium или после верификации 18+'
-    setTimeout(() => modeError.value = '', 3000)
+async function toggleNsfw() {
+  const newMode = auth.user?.behavior_mode === 'nsfw' ? 'default' : 'nsfw'
+  if (newMode === 'nsfw' && !auth.canNsfw) {
+    nsfwError.value = 'NSFW доступен с Premium или после верификации 18+'
+    setTimeout(() => nsfwError.value = '', 3000)
     return
   }
   try {
-    await auth.updateSettings({ behavior_mode: mode })
-    modeError.value = ''
+    await auth.updateSettings({ behavior_mode: newMode })
+    nsfwError.value = ''
     nsfwGeoBlocked.value = false
   } catch (e: any) {
     const msg: string = e.message || ''
     if (msg.includes('регион') || msg.includes('geo')) nsfwGeoBlocked.value = true
-    modeError.value = msg
-    setTimeout(() => { modeError.value = ''; nsfwGeoBlocked.value = false }, 4000)
+    nsfwError.value = msg
+    setTimeout(() => { nsfwError.value = ''; nsfwGeoBlocked.value = false }, 4000)
   }
 }
 
@@ -285,36 +278,28 @@ async function clearChat() {
           <template v-else-if="activeTab === 'general'">
             <h2 class="text-xl font-semibold tracking-tight text-[var(--fg)]">Основные</h2>
 
-            <!-- Mode error -->
-            <div v-if="modeError"
-                 class="rounded-[8px] border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
-              {{ modeError }}
-            </div>
-
             <Card padding="md">
-              <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-3">Режим поведения</div>
-              <div class="grid gap-2 sm:grid-cols-2">
-                <div
-                  v-for="m in modes" :key="m.id"
-                  @click="m.restricted && !auth.canNsfw ? undefined : setMode(m.id)"
-                  class="flex flex-col gap-1 rounded-[10px] border p-3 transition-all duration-150"
-                  :class="[
-                    auth.user?.behavior_mode === m.id
-                      ? 'bg-violet-500/15 border-violet-500/40'
-                      : 'border-[var(--border)] hover:border-[var(--border-hover)] hover:bg-[var(--surface-2)]',
-                    m.restricted && !auth.canNsfw ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
-                  ]"
-                >
-                  <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-[var(--fg)]">{{ m.name }}</span>
-                    <span v-if="auth.user?.behavior_mode === m.id"
-                          class="text-[10px] text-violet-400">● активен</span>
-                    <span v-else-if="m.restricted && !auth.canNsfw"
-                          class="text-[10px] text-[var(--fg-subtle)]">✦ Premium</span>
-                  </div>
-                  <p class="text-xs text-[var(--fg-muted)]">{{ m.desc }}</p>
-                  <p v-if="m.restricted && nsfwGeoBlocked" class="text-xs text-red-400">✖ Недоступно в регионе</p>
+              <div class="text-[11px] font-mono tracking-wider uppercase text-[var(--fg-subtle)] mb-3">NSFW-режим</div>
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <p class="text-sm text-[var(--fg)]">Снять фильтры контента</p>
+                  <p class="text-xs text-[var(--fg-muted)] mt-0.5">
+                    Требуется Premium или верификация 18+. Режим поведения персонажей выбирается в чате отдельно.
+                  </p>
+                  <p v-if="nsfwError" class="text-xs text-red-400 mt-1">{{ nsfwError }}</p>
+                  <p v-if="nsfwGeoBlocked" class="text-xs text-red-400 mt-1">✖ Недоступно в вашем регионе</p>
                 </div>
+                <button
+                  @click="toggleNsfw"
+                  :disabled="!auth.canNsfw"
+                  class="relative shrink-0 rounded-full transition-all duration-200 w-11 h-6 border-2"
+                  :class="auth.user?.behavior_mode === 'nsfw'
+                    ? 'bg-violet-600 border-violet-600'
+                    : 'bg-transparent border-[var(--border)] hover:border-violet-500/50'"
+                >
+                  <span class="absolute top-0.5 left-0.5 size-4 rounded-full bg-white transition-transform duration-200"
+                        :class="auth.user?.behavior_mode === 'nsfw' ? 'translate-x-5' : 'translate-x-0'" />
+                </button>
               </div>
             </Card>
           </template>

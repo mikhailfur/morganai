@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 
-const activeTab = ref<'overview' | 'users' | 'subscriptions' | 'limits' | 'events' | 'finance'>('overview')
+const activeTab = ref<'overview' | 'users' | 'subscriptions' | 'limits' | 'events' | 'finance' | 'tickets' | 'moderation' | 'campaigns'>('overview')
 
 interface AdminStats { total_users: number; premium_users: number; active_users: number; total_messages: number }
-interface AdminUser { id: number; email: string; username: string; is_premium: boolean; is_admin: boolean; is_banned: boolean; subscription_type: string; subscription_expires_at: number | null; total_messages: number; last_active: number }
+interface AdminUser { id: number; email: string; username: string; is_premium: boolean; is_admin: boolean; is_support: boolean; is_banned: boolean; subscription_type: string; subscription_expires_at: number | null; total_messages: number; last_active: number }
 interface PlanLimit { plan_type: string; daily_message_limit: number; context_messages: number; context_chars: number; voice_limit: number; voice_window_hours: number }
 interface AdminEvent { id: number; admin_id: number; admin_email: string | null; target_email: string | null; action: string; details: any; created_at: number }
 interface FinanceData {
@@ -12,6 +12,10 @@ interface FinanceData {
   model: string
   platform: { total_users: number; premium_users: number; active_users: number; total_messages: number }
 }
+interface ModerationChar { id: number; user_id: number; name: string; description: string; system_prompt: string; moderation_status: string; is_nsfw: boolean; rejection_reason: string | null; created_at: number; author_name: string }
+interface AdminTicket { id: number; user_id: number; user_email: string; user_name: string; subject: string; status: string; created_at: number; updated_at: number; messages?: TicketMsg[] }
+interface TicketMsg { id: number; sender_role: 'user' | 'support'; sender_name: string; content: string; created_at: number }
+interface AdminCampaign { id: number; character_slug: string; title: string; description: string; cover_url: string; is_active: boolean; sort_order: number; scene_count: number }
 
 const stats      = ref<AdminStats>({ total_users: 0, premium_users: 0, active_users: 0, total_messages: 0 })
 const users      = ref<AdminUser[]>([])
@@ -21,6 +25,27 @@ const finance    = ref<FinanceData | null>(null)
 const financeLoading = ref(false)
 const loading    = ref(true)
 const filter     = ref('все')
+
+// Moderation
+const modChars       = ref<ModerationChar[]>([])
+const modFilter      = ref('pending')
+const modLoading     = ref(false)
+const rejectingId    = ref<number | null>(null)
+const rejectReason   = ref('')
+
+// Tickets
+const tickets        = ref<AdminTicket[]>([])
+const ticketsFilter  = ref('all')
+const activeTicket   = ref<AdminTicket | null>(null)
+const ticketReply    = ref('')
+const ticketSending  = ref(false)
+const ticketLoading  = ref(false)
+
+// Campaigns
+const campaigns       = ref<AdminCampaign[]>([])
+const campaignsLoading = ref(false)
+const showCampaignForm = ref(false)
+const newCampaign      = ref({ character_slug: '', title: '', description: '', cover_url: '', sort_order: 0 })
 
 const apiFetch = (url: string, opts: RequestInit = {}) =>
   fetch(url, { ...opts, credentials: 'include', headers: { 'Content-Type': 'application/json', ...((opts as any).headers || {}) } })
@@ -56,11 +81,113 @@ async function loadFinance() {
   } finally { financeLoading.value = false }
 }
 
+async function loadModeration() {
+  modLoading.value = true
+  try {
+    const res = await apiFetch(`/api/admin/characters?status=${modFilter.value}`).then(r => r.json())
+    modChars.value = res.characters || []
+  } finally { modLoading.value = false }
+}
+
+async function moderateChar(id: number, status: 'approved' | 'rejected', isNsfw?: boolean) {
+  await apiFetch(`/api/admin/characters/${id}/moderate`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, rejection_reason: rejectReason.value.trim() || undefined, is_nsfw: isNsfw }),
+  })
+  rejectReason.value = ''
+  rejectingId.value = null
+  await loadModeration()
+}
+
+async function loadTickets() {
+  ticketLoading.value = true
+  try {
+    const q = ticketsFilter.value !== 'all' ? `?status=${ticketsFilter.value}` : ''
+    const res = await apiFetch(`/api/support/admin/tickets${q}`).then(r => r.json())
+    tickets.value = res.tickets || []
+  } finally { ticketLoading.value = false }
+}
+
+async function openAdminTicket(ticket: AdminTicket) {
+  ticketLoading.value = true
+  try {
+    const res = await apiFetch(`/api/support/admin/tickets/${ticket.id}`).then(r => r.json())
+    activeTicket.value = res.ticket
+  } finally { ticketLoading.value = false }
+}
+
+async function sendTicketReply() {
+  if (!ticketReply.value.trim() || !activeTicket.value) return
+  ticketSending.value = true
+  try {
+    await apiFetch(`/api/support/admin/tickets/${activeTicket.value.id}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content: ticketReply.value.trim() }),
+    })
+    ticketReply.value = ''
+    await openAdminTicket(activeTicket.value)
+  } finally { ticketSending.value = false }
+}
+
+async function setTicketStatus(status: string) {
+  if (!activeTicket.value) return
+  await apiFetch(`/api/support/admin/tickets/${activeTicket.value.id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
+  activeTicket.value.status = status as any
+  await loadTickets()
+}
+
+async function toggleSupport(userId: number, isSupport: boolean) {
+  await apiFetch(`/api/admin/user/${userId}/support`, { method: 'PUT', body: JSON.stringify({ is_support: !isSupport }) })
+  const u = users.value.find(u => u.id === userId)
+  if (u) u.is_support = !isSupport
+}
+
+async function loadCampaigns() {
+  campaignsLoading.value = true
+  try {
+    const res = await apiFetch('/api/admin/campaigns').then(r => r.json())
+    campaigns.value = res.campaigns || []
+  } finally { campaignsLoading.value = false }
+}
+
+async function createCampaign() {
+  if (!newCampaign.value.character_slug.trim() || !newCampaign.value.title.trim()) return
+  await apiFetch('/api/admin/campaigns', { method: 'POST', body: JSON.stringify(newCampaign.value) })
+  newCampaign.value = { character_slug: '', title: '', description: '', cover_url: '', sort_order: 0 }
+  showCampaignForm.value = false
+  await loadCampaigns()
+}
+
+async function deleteCampaign(id: number) {
+  if (!confirm('Удалить кампанию?')) return
+  await apiFetch(`/api/admin/campaigns/${id}`, { method: 'DELETE' })
+  campaigns.value = campaigns.value.filter(c => c.id !== id)
+}
+
 async function switchTab(tab: typeof activeTab.value) {
   activeTab.value = tab
-  if (tab === 'limits'  && Object.keys(planLimits.value).length === 0) await loadLimits()
-  if (tab === 'events'  && events.value.length === 0) await loadEvents()
-  if (tab === 'finance' && !finance.value) await loadFinance()
+  activeTicket.value = null
+  if (tab === 'limits'      && Object.keys(planLimits.value).length === 0) await loadLimits()
+  if (tab === 'events'      && events.value.length === 0) await loadEvents()
+  if (tab === 'finance'     && !finance.value) await loadFinance()
+  if (tab === 'moderation'  && modChars.value.length === 0) await loadModeration()
+  if (tab === 'tickets'     && tickets.value.length === 0) await loadTickets()
+  if (tab === 'campaigns'   && campaigns.value.length === 0) await loadCampaigns()
+}
+
+const ticketStatusColor: Record<string, string> = {
+  open: 'text-violet-400',
+  in_progress: 'text-amber-400',
+  closed: 'opacity-50',
+}
+const ticketStatusLabel: Record<string, string> = {
+  open: 'Открыт',
+  in_progress: 'В работе',
+  closed: 'Закрыт',
+  all: 'Все',
 }
 
 const eventLabels: Record<string, string> = {
@@ -228,7 +355,8 @@ const editCell  = 'cursor-pointer px-1.5 py-1 rounded transition-all font-mono t
          style="scrollbar-width:none">
       <button v-for="[id, label] in [
         ['overview','Обзор'],['users','Пользователи'],['subscriptions','Подписки'],
-        ['limits','Лимиты'],['events','Лог событий'],['finance','Финансы']
+        ['limits','Лимиты'],['events','Лог событий'],['finance','Финансы'],
+        ['tickets','Тикеты'],['moderation','Модерация'],['campaigns','Кампании']
       ]" :key="id" @click="switchTab(id as any)" :class="tabCls(id)">
         {{ label }}
       </button>
@@ -300,8 +428,11 @@ const editCell  = 'cursor-pointer px-1.5 py-1 rounded transition-all font-mono t
                 <td class="px-4 py-3 font-mono text-[12px]">{{ u.total_messages }}</td>
                 <td class="px-4 py-3 font-mono text-[11px] opacity-60">{{ formatDate(u.last_active) }}</td>
                 <td class="px-4 py-3">
-                  <div class="flex gap-2 justify-end">
+                  <div class="flex gap-2 justify-end flex-wrap">
                     <button v-if="u.is_premium" :class="actBtn" @click="revokeSubscription(u.id)">Отозвать</button>
+                    <button :class="actBtn" @click="toggleSupport(u.id, u.is_support)">
+                      {{ u.is_support ? 'Снять саппорт' : 'Саппорт' }}
+                    </button>
                     <button :class="dangerBtn" @click="toggleBan(u.id, u.is_banned)">
                       {{ u.is_banned ? 'Разбан' : 'Бан' }}
                     </button>
@@ -626,6 +757,234 @@ const editCell  = 'cursor-pointer px-1.5 py-1 rounded transition-all font-mono t
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TICKETS ── -->
+      <div v-if="activeTab === 'tickets'">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <span class="font-mono text-[10px] tracking-[0.14em] uppercase text-[var(--fg-subtle)]">
+            Тикеты поддержки ({{ tickets.length }})
+          </span>
+          <div class="flex border border-[var(--border)]">
+            <button v-for="(s, i) in ['all', 'open', 'in_progress', 'closed']" :key="s"
+                    @click="ticketsFilter = s; loadTickets()"
+                    :class="subTabCls(s, ticketsFilter)"
+                    :style="{ borderLeft: i > 0 ? '1px solid var(--border)' : 'none' }">
+              {{ ticketStatusLabel[s] }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="ticketLoading && !activeTicket" class="py-10 text-center font-mono text-[11px] tracking-[1.4px] uppercase text-[var(--fg)] opacity-50 border border-[var(--border)]">
+          Загрузка...
+        </div>
+
+        <!-- Ticket list -->
+        <div v-else-if="!activeTicket" class="border border-[var(--border)]">
+          <div v-for="(t, i) in tickets" :key="t.id"
+               @click="openAdminTicket(t)"
+               class="flex items-start gap-4 px-4 py-3 cursor-pointer hover:bg-[var(--surface-2)] transition-colors"
+               :style="{ borderTop: i > 0 ? '1px solid var(--border)' : 'none' }">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-mono text-[11px] tracking-[1px] opacity-60">#{{ t.id }}</span>
+                <span class="text-sm font-medium truncate">{{ t.subject }}</span>
+                <span :class="['font-mono text-[10px] tracking-[1px] uppercase', ticketStatusColor[t.status]]">
+                  {{ ticketStatusLabel[t.status] }}
+                </span>
+              </div>
+              <div class="font-mono text-[11px] opacity-60 mt-0.5">
+                {{ t.user_email }} ({{ t.user_name }}) · {{ formatDate(t.updated_at) }}
+              </div>
+            </div>
+            <span class="text-[12px] opacity-40">→</span>
+          </div>
+          <div v-if="tickets.length === 0" class="px-4 py-8 text-center italic text-[var(--fg)] opacity-50">
+            Нет тикетов
+          </div>
+        </div>
+
+        <!-- Ticket detail -->
+        <div v-else>
+          <div class="flex items-center gap-3 mb-4 flex-wrap">
+            <button :class="actBtn" @click="activeTicket = null">← Назад</button>
+            <span class="font-mono text-[11px] opacity-60">#{{ activeTicket.id }} · {{ activeTicket.user_email }}</span>
+            <span :class="['font-mono text-[10px] tracking-[1px] uppercase ml-auto', ticketStatusColor[activeTicket.status]]">
+              {{ ticketStatusLabel[activeTicket.status] }}
+            </span>
+          </div>
+          <div class="font-medium mb-3">{{ activeTicket.subject }}</div>
+
+          <div class="flex gap-2 mb-4 flex-wrap">
+            <button v-for="s in ['open', 'in_progress', 'closed']" :key="s"
+                    :class="[actBtn, activeTicket.status === s ? 'opacity-100' : 'opacity-40']"
+                    @click="setTicketStatus(s)">
+              {{ ticketStatusLabel[s] }}
+            </button>
+          </div>
+
+          <div class="border border-[var(--border)] mb-4 max-h-96 overflow-y-auto">
+            <div v-for="(msg, i) in activeTicket.messages" :key="msg.id"
+                 class="px-4 py-3"
+                 :class="[i > 0 ? 'border-t border-[var(--border)]' : '', msg.sender_role === 'support' ? 'bg-violet-500/5' : '']">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="font-mono text-[10px] uppercase tracking-[1px]"
+                      :class="msg.sender_role === 'support' ? 'text-[var(--accent-soft)]' : 'opacity-60'">
+                  {{ msg.sender_role === 'support' ? 'Поддержка' : msg.sender_name }}
+                </span>
+                <span class="font-mono text-[10px] opacity-40">{{ formatDate(msg.created_at) }}</span>
+              </div>
+              <p class="text-[13px] whitespace-pre-wrap">{{ msg.content }}</p>
+            </div>
+            <div v-if="!activeTicket.messages?.length"
+                 class="px-4 py-6 text-center italic opacity-50 text-sm">
+              Нет сообщений
+            </div>
+          </div>
+
+          <div v-if="activeTicket.status !== 'closed'" class="flex gap-2">
+            <textarea v-model="ticketReply" placeholder="Ответ..." rows="2"
+                      class="m-textarea flex-1 text-sm resize-none" />
+            <button :class="actBtn" @click="sendTicketReply"
+                    :disabled="ticketSending || !ticketReply.trim()"
+                    class="self-end">
+              {{ ticketSending ? '...' : 'Отправить' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODERATION ── -->
+      <div v-if="activeTab === 'moderation'">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <span class="font-mono text-[10px] tracking-[0.14em] uppercase text-[var(--fg-subtle)]">
+            Модерация персонажей ({{ modChars.length }})
+          </span>
+          <div class="flex border border-[var(--border)]">
+            <button v-for="(s, i) in ['pending', 'approved', 'rejected']" :key="s"
+                    @click="modFilter = s; loadModeration()"
+                    :class="subTabCls(s, modFilter)"
+                    :style="{ borderLeft: i > 0 ? '1px solid var(--border)' : 'none' }">
+              {{ s === 'pending' ? 'На рассмотрении' : s === 'approved' ? 'Одобрены' : 'Отклонены' }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="modLoading" class="py-10 text-center font-mono text-[11px] tracking-[1.4px] uppercase text-[var(--fg)] opacity-50 border border-[var(--border)]">
+          Загрузка...
+        </div>
+
+        <div v-else class="grid gap-3">
+          <div v-for="char in modChars" :key="char.id"
+               class="border border-[var(--border)] p-4 bg-[var(--surface)]">
+            <div class="flex items-start gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                  <span class="font-medium">{{ char.name }}</span>
+                  <span v-if="char.is_nsfw"
+                        class="font-mono text-[9px] tracking-[1px] uppercase text-[var(--danger)] border border-[var(--danger)] px-1.5 py-0.5">NSFW</span>
+                  <span class="font-mono text-[10px] opacity-60">ID {{ char.id }} · {{ char.author_name }}</span>
+                </div>
+                <p class="text-[13px] opacity-70 truncate">{{ char.description }}</p>
+                <p v-if="char.rejection_reason" class="text-[12px] text-[var(--danger)] mt-1">
+                  Причина: {{ char.rejection_reason }}
+                </p>
+              </div>
+              <div class="flex flex-col gap-1.5 shrink-0">
+                <button v-if="modFilter !== 'approved'" :class="actBtn"
+                        @click="moderateChar(char.id, 'approved')">
+                  Одобрить
+                </button>
+                <button v-if="!char.is_nsfw" :class="actBtn"
+                        @click="moderateChar(char.id, 'approved', true)">
+                  + NSFW
+                </button>
+                <button v-if="modFilter !== 'rejected'" :class="dangerBtn"
+                        @click="rejectingId = rejectingId === char.id ? null : char.id">
+                  Отклонить
+                </button>
+              </div>
+            </div>
+            <div v-if="rejectingId === char.id" class="mt-3 flex gap-2">
+              <input v-model="rejectReason" placeholder="Причина отказа..." class="m-input flex-1 text-sm" />
+              <button :class="dangerBtn" @click="moderateChar(char.id, 'rejected')">ОК</button>
+              <button :class="actBtn" @click="rejectingId = null">Отмена</button>
+            </div>
+          </div>
+          <div v-if="modChars.length === 0"
+               class="py-8 text-center italic text-[var(--fg)] opacity-50 border border-[var(--border)]">
+            Нет персонажей
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CAMPAIGNS ── -->
+      <div v-if="activeTab === 'campaigns'">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <span class="font-mono text-[10px] tracking-[0.14em] uppercase text-[var(--fg-subtle)]">
+            Кампании ({{ campaigns.length }})
+          </span>
+          <div class="flex gap-2">
+            <button :class="actBtn" @click="loadCampaigns">↺ Обновить</button>
+            <button :class="actBtn" @click="showCampaignForm = !showCampaignForm">+ Создать</button>
+          </div>
+        </div>
+
+        <div v-if="showCampaignForm" class="border border-[var(--border)] p-5 mb-4 bg-[var(--surface)]">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="font-mono text-[10px] tracking-[1.2px] uppercase opacity-60 block mb-1">Персонаж (slug)</label>
+              <input v-model="newCampaign.character_slug" class="m-input w-full text-sm" placeholder="morgan" />
+            </div>
+            <div>
+              <label class="font-mono text-[10px] tracking-[1.2px] uppercase opacity-60 block mb-1">Название</label>
+              <input v-model="newCampaign.title" class="m-input w-full text-sm" placeholder="Название кампании" />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="font-mono text-[10px] tracking-[1.2px] uppercase opacity-60 block mb-1">Описание</label>
+              <input v-model="newCampaign.description" class="m-input w-full text-sm" placeholder="Краткое описание" />
+            </div>
+            <div>
+              <label class="font-mono text-[10px] tracking-[1.2px] uppercase opacity-60 block mb-1">Cover URL</label>
+              <input v-model="newCampaign.cover_url" class="m-input w-full text-sm" placeholder="https://..." />
+            </div>
+            <div>
+              <label class="font-mono text-[10px] tracking-[1.2px] uppercase opacity-60 block mb-1">Sort order</label>
+              <input v-model.number="newCampaign.sort_order" type="number" class="m-input w-full text-sm" />
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button :class="actBtn" @click="createCampaign">Создать</button>
+            <button :class="actBtn" @click="showCampaignForm = false">Отмена</button>
+          </div>
+        </div>
+
+        <div v-if="campaignsLoading" class="py-10 text-center font-mono text-[11px] tracking-[1.4px] uppercase text-[var(--fg)] opacity-50 border border-[var(--border)]">
+          Загрузка...
+        </div>
+
+        <div v-else class="border border-[var(--border)]">
+          <div v-for="(c, i) in campaigns" :key="c.id"
+               class="flex items-center gap-4 px-4 py-3"
+               :style="{ borderTop: i > 0 ? '1px solid var(--border)' : 'none' }">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-medium">{{ c.title }}</span>
+                <span class="font-mono text-[10px] opacity-60">{{ c.character_slug }} · {{ c.scene_count }} сцен</span>
+                <span v-if="!c.is_active"
+                      class="font-mono text-[9px] tracking-[1px] uppercase opacity-40 border border-[var(--border)] px-1.5 py-0.5">
+                  Неактивна
+                </span>
+              </div>
+              <p v-if="c.description" class="text-[12px] opacity-60 mt-0.5 truncate">{{ c.description }}</p>
+            </div>
+            <button :class="dangerBtn" @click="deleteCampaign(c.id)">Удалить</button>
+          </div>
+          <div v-if="campaigns.length === 0"
+               class="px-4 py-8 text-center italic text-[var(--fg)] opacity-50">
+            Нет кампаний
           </div>
         </div>
       </div>

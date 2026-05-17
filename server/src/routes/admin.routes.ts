@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { database } from '../database';
 import { config } from '../config';
+import { supportMiddleware } from '../auth';
 
 const router = Router();
 
@@ -59,6 +60,19 @@ router.put('/user/:id/premium', async (req: any, res: Response) => {
       await database.setUserSubscription(userId, is_premium ? 'premium' : 'free');
     }
     await database.logAdminEvent(req.user.userId, 'premium_toggle', userId, { is_premium, months });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// Set/revoke support role
+router.put('/user/:id/support', async (req: any, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { is_support } = req.body;
+    await database.setUserSupport(userId, Boolean(is_support));
+    await database.logAdminEvent(req.user.userId, is_support ? 'support_granted' : 'support_revoked', userId);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Ошибка' });
@@ -139,6 +153,119 @@ router.get('/finance', async (_req: any, res: Response) => {
     });
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Ошибка' });
+  }
+});
+
+// === User character moderation (support + admin) ===
+
+router.get('/characters', supportMiddleware, async (req: any, res: Response) => {
+  try {
+    const status = req.query.status as string | undefined;
+    const page = parseInt(req.query.page as string) || 0;
+    const chars = await database.getCharactersForModeration(status, page);
+    res.json({ characters: chars });
+  } catch {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+router.patch('/characters/:id/moderate', supportMiddleware, async (req: any, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { status, rejection_reason, is_nsfw } = req.body;
+    const validStatuses = ['approved', 'rejected'];
+    if (!validStatuses.includes(status)) { res.status(400).json({ error: 'Неверный статус' }); return; }
+    if (status === 'rejected' && !rejection_reason?.trim()) {
+      res.status(400).json({ error: 'Причина отклонения обязательна' }); return;
+    }
+
+    await database.moderateUserCharacter(id, status, req.user.userId, rejection_reason?.trim());
+    if (is_nsfw !== undefined) await database.setUserCharacterNsfw(id, Boolean(is_nsfw));
+
+    await database.logAdminEvent(req.user.userId, `character_${status}`, undefined, { character_id: id, rejection_reason });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// === Campaign admin CRUD ===
+
+router.get('/campaigns', async (_req: any, res: Response) => {
+  try {
+    const campaigns = await database.getAllCampaigns();
+    res.json({ campaigns });
+  } catch {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+router.post('/campaigns', async (req: any, res: Response) => {
+  try {
+    const { character_slug, title, description, cover_url, sort_order } = req.body;
+    if (!character_slug?.trim() || !title?.trim()) {
+      res.status(400).json({ error: 'character_slug и title обязательны' }); return;
+    }
+    const id = await database.createCampaign({ character_slug, title, description, cover_url, sort_order });
+    res.status(201).json({ id });
+  } catch {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+router.patch('/campaigns/:id', async (req: any, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { title, description, cover_url, is_active, sort_order } = req.body;
+    await database.updateCampaign(id, { title, description, cover_url, is_active, sort_order });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+router.delete('/campaigns/:id', async (req: any, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    await database.deleteCampaign(id);
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+router.post('/campaigns/:id/scenes', async (req: any, res: Response) => {
+  try {
+    const campaignId = parseInt(req.params.id, 10);
+    const { scene_order, title, location, situation, context_prompt } = req.body;
+    if (!title?.trim() || !context_prompt?.trim()) {
+      res.status(400).json({ error: 'title и context_prompt обязательны' }); return;
+    }
+    const id = await database.createCampaignScene({ campaign_id: campaignId, scene_order: scene_order || 0, title, location, situation, context_prompt });
+    res.status(201).json({ id });
+  } catch {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+router.patch('/campaigns/:id/scenes/:sceneId', async (req: any, res: Response) => {
+  try {
+    const sceneId = parseInt(req.params.sceneId, 10);
+    const { scene_order, title, location, situation, context_prompt } = req.body;
+    await database.updateCampaignScene(sceneId, { scene_order, title, location, situation, context_prompt });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+router.delete('/campaigns/:id/scenes/:sceneId', async (req: any, res: Response) => {
+  try {
+    const sceneId = parseInt(req.params.sceneId, 10);
+    await database.deleteCampaignScene(sceneId);
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Ошибка' });
   }
 });
 

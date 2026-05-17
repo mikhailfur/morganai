@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { database } from '../database';
 import { comparePassword, hashPassword, COOKIE_NAME } from '../auth';
 import type { GeoBlockRequest } from '../middleware/geoblock';
+import { characters } from '../characters/index';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.put('/settings', async (req: any, res: Response) => {
     const userId = req.user.userId;
 
     if (behavior_mode) {
-      const validModes = ['default', 'study', 'work', 'psychologist', 'nsfw'];
+      const validModes = ['default', 'nsfw'];
       if (!validModes.includes(behavior_mode)) { res.status(400).json({ error: 'Неверный режим' }); return; }
       if (behavior_mode === 'nsfw') {
         if ((req as GeoBlockRequest).nsfwGeoBlocked) {
@@ -121,15 +122,68 @@ router.delete('/account', async (req: any, res: Response) => {
   }
 });
 
-// Get canonical characters list
-router.get('/characters', async (_req: any, res: Response) => {
+// Get canonical characters list (with modules, filtered for user's NSFW access)
+router.get('/characters', async (req: any, res: Response) => {
   try {
-    const characters = await database.getCharacters();
-    res.json({ characters: characters.map((c: any) => ({
-      slug: c.slug, name: c.name, description: c.description,
-      avatar_url: c.avatar_url, is_premium: Boolean(c.is_premium),
-    }))});
+    const dbChars = await database.getCharacters();
+    const user = await database.getUserById(req.user.userId);
+    const isPremium = await database.checkSubscription(req.user.userId);
+    const canNsfw = isPremium || Boolean(user?.kyc_verified);
+
+    res.json({ characters: dbChars.map((c: any) => {
+      const tsChar = characters.find(ch => ch.slug === c.slug);
+      const modules = tsChar?.modules
+        ? (canNsfw ? tsChar.modules : tsChar.modules.filter(m => !m.isNsfw))
+        : undefined;
+      return {
+        slug: c.slug, name: c.name, description: c.description,
+        avatar_url: c.avatar_url, is_premium: Boolean(c.is_premium),
+        modules,
+      };
+    })});
   } catch (error) {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// GET /api/user/character-settings/:slug — get active module for character
+router.get('/character-settings/:slug', async (req: any, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const moduleId = await database.getUserCharacterModule(req.user.userId, slug);
+    res.json({ active_module_id: moduleId });
+  } catch {
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// POST /api/user/character-settings/:slug — set active module
+router.post('/character-settings/:slug', async (req: any, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const { module_id } = req.body;
+    if (!module_id) { res.status(400).json({ error: 'module_id обязателен' }); return; }
+
+    const tsChar = characters.find(ch => ch.slug === slug);
+    if (!tsChar?.modules) { res.status(404).json({ error: 'Персонаж или модули не найдены' }); return; }
+
+    const module = tsChar.modules.find(m => m.id === module_id);
+    if (!module) { res.status(400).json({ error: 'Модуль не найден' }); return; }
+
+    if (module.isNsfw) {
+      if ((req as GeoBlockRequest).nsfwGeoBlocked) {
+        res.status(403).json({ error: 'NSFW недоступен в вашем регионе' }); return;
+      }
+      const user = await database.getUserById(req.user.userId);
+      const isPremium = await database.checkSubscription(req.user.userId);
+      if (!isPremium && !user?.kyc_verified) {
+        res.status(403).json({ error: 'NSFW доступен только с Premium или после подтверждения возраста' }); return;
+      }
+    }
+
+    await database.setUserCharacterModule(req.user.userId, slug, module_id);
+    res.json({ active_module_id: module_id });
+  } catch {
     res.status(500).json({ error: 'Ошибка' });
   }
 });
@@ -140,6 +194,8 @@ const formatUserChar = (c: any) => ({
   id: c.id, user_id: c.user_id, name: c.name, description: c.description,
   avatar_url: c.avatar_url, system_prompt: c.system_prompt,
   greeting_message: c.greeting_message, is_public: Boolean(c.is_public),
+  is_nsfw: Boolean(c.is_nsfw), moderation_status: c.moderation_status,
+  rejection_reason: c.rejection_reason || null,
   created_at: c.created_at, author_name: c.author_name,
 });
 
@@ -156,12 +212,12 @@ router.get('/characters/my', async (req: any, res: Response) => {
 // POST /api/user/characters — создать персонажа
 router.post('/characters', async (req: any, res: Response) => {
   try {
-    const { name, description, system_prompt, greeting_message, avatar_url, is_public } = req.body;
+    const { name, description, system_prompt, greeting_message, avatar_url, is_public, is_nsfw } = req.body;
     if (!name?.trim()) { res.status(400).json({ error: 'Имя обязательно' }); return; }
     if (!system_prompt?.trim()) { res.status(400).json({ error: 'Системный промпт обязателен' }); return; }
     const id = await database.createUserCharacter(req.user.userId, {
       name: name.trim(), description, system_prompt: system_prompt.trim(),
-      greeting_message, avatar_url, is_public: Boolean(is_public),
+      greeting_message, avatar_url, is_public: Boolean(is_public), is_nsfw: Boolean(is_nsfw),
     });
     const char = await database.getUserCharacterById(id, req.user.userId);
     res.status(201).json({ character: formatUserChar(char) });
@@ -194,8 +250,12 @@ router.patch('/characters/:id/publish', async (req: any, res: Response) => {
     const id = parseInt(req.params.id, 10);
     const char = await database.getUserCharacterById(id, req.user.userId);
     if (!char) { res.status(404).json({ error: 'Не найден' }); return; }
-    await database.updateUserCharacter(id, req.user.userId, { is_public: !char.is_public });
-    res.json({ is_public: !Boolean(char.is_public) });
+    const newPublic = !Boolean(char.is_public);
+    const updates: any = { is_public: newPublic };
+    // При публикации — сбросить на pending для прохождения модерации
+    if (newPublic) updates.moderation_status = 'pending';
+    await database.updateUserCharacter(id, req.user.userId, updates);
+    res.json({ is_public: newPublic, moderation_status: newPublic ? 'pending' : char.moderation_status });
   } catch (error) {
     res.status(500).json({ error: 'Ошибка' });
   }

@@ -150,13 +150,16 @@ CI/CD: `.github/workflows/deploy.yml` — триггер push в `dev` → Docke
 | `server/src/routes/auth.routes.ts` | register, login, logout, me, config, google, telegram |
 | `server/src/routes/user.routes.ts` | settings, change-password, delete-account, kyc-verify, characters |
 | `server/src/routes/chat.routes.ts` | send, stream (с лимитами и кэшем), history, clear |
-| `server/src/routes/admin.routes.ts` | stats, users, ban, subscription, plan-limits, events |
+| `server/src/routes/admin.routes.ts` | stats, users, ban, subscription, plan-limits, events, moderation, campaigns |
+| `server/src/routes/support.routes.ts` | user ticket CRUD + staff admin endpoints |
+| `server/src/routes/campaigns.routes.ts` | campaign list, detail, progress start/update |
 | `client/src/stores/auth.ts` | Pinia: login/logout/register/google/telegram, `appConfig` (runtime env) |
 | `client/src/stores/theme.ts` | Тема Yume/Nocturne, **slide overlay** при переключении |
 | `client/src/style.css` | Дизайн-система: CSS variables, компоненты, анимации |
 | `client/src/components/CookieBanner.vue` | GDPR cookie consent баннер |
 | `client/src/views/SettingsView.vue` | Настройки: смена пароля, удаление аккаунта, KYC/18+, NSFW |
-| `client/src/views/AdminView.vue` | Таб-панель: обзор, пользователи, подписки, лимиты, лог событий |
+| `client/src/views/AdminView.vue` | Таб-панель: обзор, пользователи, подписки, лимиты, лог событий, тикеты, модерация, кампании |
+| `client/src/views/SupportView.vue` | Мобильная страница тикетов поддержки для пользователя |
 | `client/public/logo.svg` | Логотип — SVG, прозрачный фон, работает в обеих темах |
 | `client/public/characters/` | Арт персонажей: `morgan-portrait.png`, `morgan-hero.png` |
 | `Docs/` | Гайды: OAuth setup, art placeholders, character prompts, CHANGELOG |
@@ -203,7 +206,8 @@ NODE_ENV=production
 Все timestamps — BIGINT миллисекунды (`Date.now()`).
 
 **`users` — ключевые поля:**
-- `behavior_mode`: `'default' | 'study' | 'work' | 'psychologist' | 'nsfw'`
+- `behavior_mode`: `'default' | 'nsfw'` (глобальный NSFW-тогл; study/work/psychologist убраны — они стали модулями персонажа)
+- `is_support`: BOOLEAN — роль саппорта, назначается через Admin → Пользователи
 - `selected_character`: slug (default `'morgan'`)
 - `subscription_type`: `'free' | 'premium' | 'premium_plus'`
 - `subscription_expires_at`: BIGINT — если < Date.now(), авто-downgrade на free
@@ -299,6 +303,19 @@ Vite/rolldown при сборке пытается разрешить их ка�
 
 ---
 
+## Роли пользователей
+
+| Флаг | Описание | Назначение |
+|------|----------|-----------|
+| `is_admin` | Полный доступ к Admin панели | `ADMIN_EMAILS` в `.env` при регистрации |
+| `is_support` | Тикеты + модерация персонажей | Admin → Пользователи → кнопка «Саппорт» |
+| `kyc_verified + isPremium` | `canNsfw = true` | Разблокирует NSFW-режим и NSFW-модуль |
+| `is_banned` | Блокировка в `authMiddleware` → 403 | Admin → Пользователи → кнопка «Бан» |
+
+`isStaff = isAdmin || isSupport` — проверяет `supportMiddleware` в `auth.ts`.
+
+---
+
 ## Что реализовано (основные фазы)
 
 - **httpOnly Cookie Auth** — `morgan_token` cookie, `credentials: 'include'` везде
@@ -312,7 +329,12 @@ Vite/rolldown при сборке пытается разрешить их ка�
 - **Prompt Variables** — `injectPromptVariables()` с `{{user_name}}`, `{{user_time}}`, `{{current_date}}`
 - **Google OAuth** — renderButton overlay (popup), `google-auth-library` верификация
 - **Telegram OAuth** — Login Widget, HMAC-SHA256 верификация
-- **Admin Panel** — tabs: обзор, пользователи, подписки, лимиты, лог событий, ban
+- **Admin Panel** — tabs: обзор, пользователи (+ бан/саппорт), подписки, лимиты, лог событий, финансы, тикеты, модерация, кампании
+- **Система тикетов** — `support_tickets`, `ticket_messages`; страница `/support`; staff-интерфейс в Admin
+- **Роль `is_support`** — `supportMiddleware`, назначается через Admin → Пользователи
+- **Модерация user characters** — `moderation_status` (pending/approved/rejected), `is_nsfw`, `rejection_reason`
+- **Модули поведения** — `BehaviorModule[]` в TS-файлах персонажей; per-character настройка в `user_character_settings`; NSFW-модуль; `[NSFW_BLOCKED]` попап
+- **Кампании** — `campaigns`, `campaign_scenes`, `user_campaign_progress`; Premium-gate; сцена инжектируется в system prompt
 - **Logo SVG** — `logo.svg` прозрачный фон, работает в обеих темах; все изображения персонажей в `client/public/characters/`
 
 ---
@@ -332,10 +354,17 @@ Vite/rolldown при сборке пытается разрешить их ка�
 
 ---
 
-## Как добавить новый режим поведения
+## Как добавить модуль к персонажу
 
-Изменить 4 места:
-1. `server/src/prompt.ts` — добавить case в `getBehaviorPrompt()`
-2. `client/src/views/ChatView.vue` — массив `modes` в модале настроек
-3. `client/src/views/SettingsView.vue` — массив `modes`
-4. `server/src/routes/user.routes.ts` — массив `validModes`
+Модули — поведенческие пресеты, определённые прямо в TS-файлах каноничных персонажей.
+
+1. Открыть `server/src/characters/<имя>.ts`
+2. Добавить объект в массив `modules[]`:
+   ```typescript
+   { id: 'study', name: 'Учёба', description: 'Репетитор', promptAddition: '## УЧЁБА\n...', isNsfw?: true }
+   ```
+3. Всегда должен быть модуль с `id='default'` и пустым `promptAddition`
+4. NSFW-модуль (`isNsfw: true`) скрывается если `!auth.canNsfw`, при потере доступа fallback на `default`
+5. Пользовательские персонажи (`uc:*`) модулей не имеют
+
+Глобальный `behavior_mode` — только `'default' | 'nsfw'`, изменяется в `/settings`. Модули персонажа — отдельно в шапке чата.

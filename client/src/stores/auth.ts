@@ -15,6 +15,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => !!user.value);
   const isAdmin = computed(() => user.value?.is_admin ?? false);
+  const isSupport = computed(() => user.value?.is_support ?? false);
+  const isStaff = computed(() => isAdmin.value || isSupport.value);
   const isPremium = computed(() => user.value?.is_premium ?? false);
   const isKycVerified = computed(() => user.value?.kyc_verified ?? false);
   const canNsfw = computed(() => isPremium.value || isKycVerified.value);
@@ -174,7 +176,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     user, loading, initialized, appConfig,
-    isAuthenticated, isAdmin, isPremium, isKycVerified, canNsfw,
+    isAuthenticated, isAdmin, isSupport, isStaff, isPremium, isKycVerified, canNsfw,
     fetchAppConfig, fetchUser, register, login, loginWithGoogle, loginWithTelegram, logout,
     updateSettings, verifyKyc, startKycSession, verifyKycReturn, changePassword, deleteAccount,
   };

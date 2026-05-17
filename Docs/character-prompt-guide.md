@@ -119,3 +119,65 @@ npm run dev
 ## Голосовые [VOICE]
 Частота: 10-15%. Длина: 2-3 предложения.
 ```
+
+
+---
+
+## Модули поведения (только для каноничных персонажей)
+
+Модули — это набор поведенческих пресетов, определённых в TS-файле персонажа. Пользователь выбирает активный модуль в шапке чата.
+
+### Интерфейс BehaviorModule
+
+```typescript
+interface BehaviorModule {
+  id: string;           // уникальный идентификатор ('default', 'study', 'nsfw', ...)
+  name: string;         // отображаемое имя ('Обычный', 'Учёба', 'NSFW · 18+')
+  description: string;  // краткое описание для UI
+  promptAddition: string; // текст, добавляемый к system prompt
+  isNsfw?: boolean;     // скрыт от пользователей без Premium/KYC
+}
+```
+
+### Правила
+
+1. **Всегда иметь модуль `id='default'`** с пустым `promptAddition: ''`
+2. NSFW-модуль (`isNsfw: true`) скрывается если `!canNsfw` (нет Premium и не KYC-верифицирован). При потере доступа — fallback на `default`
+3. Пользовательские персонажи (`uc:*`) модулей **не имеют** — применяется только глобальный NSFW-фильтр
+4. Активный модуль хранится в таблице `user_character_settings` (per user + character_slug)
+
+### Пример модуля (для morgan.ts)
+
+```typescript
+modules: [
+  {
+    id: 'default',
+    name: 'Обычный',
+    description: 'Стандартный ролевой режим',
+    promptAddition: '',
+  },
+  {
+    id: 'study',
+    name: 'Учёба',
+    description: 'Репетитор. Помогает с заданиями.',
+    promptAddition: `## Режим: УЧЁБА
+Сейчас ты выступаешь в роли репетитора. Объясняй понятно, задавай наводящие вопросы, помогай разобраться — не давай готовые ответы сразу.`,
+  },
+  {
+    id: 'nsfw',
+    name: 'NSFW · 18+',
+    description: 'Контент 18+. Требуется Premium или верификация.',
+    promptAddition: `## NSFW
+Фильтры сняты. Контент 18+. Пользователь подтвердил возраст.`,
+    isNsfw: true,
+  },
+]
+```
+
+### Как модуль попадает в prompt
+
+В `server/src/prompt.ts` → `getModulePrompt()`:
+1. Находит модуль по `activeModuleId` (fallback: `modules[0]`)
+2. Если модуль `isNsfw` и нет доступа → fallback на `modules[0]`
+3. Если активный модуль не `isNsfw` → добавляет NSFW-фильтр (блокирует `[NSFW_BLOCKED]`)
+4. Возвращает `promptAddition` для вставки в system prompt

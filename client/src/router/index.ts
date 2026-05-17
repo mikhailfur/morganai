@@ -5,6 +5,7 @@ declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean;
     requiresAdmin?: boolean;
+    requiresStaff?: boolean;
     requiresGuest?: boolean;
   }
 }
@@ -64,6 +65,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresAdmin: true },
     },
     {
+      path: '/support',
+      name: 'support',
+      component: () => import('../views/SupportView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../views/NotFoundView.vue'),
@@ -89,6 +96,11 @@ router.beforeEach(async (to) => {
 
   // Redirect non-admins away from admin panel
   if (to.meta.requiresAdmin && !auth.isAdmin) {
+    return { name: 'chat' };
+  }
+
+  // Redirect non-staff away from staff-only pages
+  if (to.meta.requiresStaff && !auth.isStaff) {
     return { name: 'chat' };
   }
 });
