@@ -193,7 +193,7 @@ async function clearChat() {
             </div>
             <div style="display: flex; gap: 3px;">
               <div v-for="i in 20" :key="i" :style="{
-                flex: 1, height: '6px', border-radius: '2px',
+                flex: 1, height: '6px', borderRadius: '2px',
                 background: i <= (auth.user?.voice_count_today || 0) ? 'linear-gradient(90deg, #7c3aed, #6366f1)' : 'var(--surface-3)',
               }"></div>
             </div>
