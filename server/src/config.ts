@@ -19,8 +19,7 @@ export interface Config {
   port: number;
   clientUrl: string;
   // Didit KYC
-  diditClientId: string;
-  diditClientSecret: string;
+  diditApiKey: string;
   diditWorkflowId: string;
   diditWebhookSecret: string;
 }
@@ -41,8 +40,7 @@ export const config: Config = {
   port: parseInt(process.env.PORT || '3001'),
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   // Didit KYC
-  diditClientId: process.env.DIDIT_CLIENT_ID || '',
-  diditClientSecret: process.env.DIDIT_CLIENT_SECRET || '',
+  diditApiKey: process.env.DIDIT_API_KEY || '',
   diditWorkflowId: process.env.DIDIT_WORKFLOW_ID || '',
   diditWebhookSecret: process.env.DIDIT_WEBHOOK_SECRET || '',
 };

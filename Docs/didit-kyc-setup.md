@@ -2,65 +2,65 @@
 
 Didit — сервис верификации личности (KYC). Используется для подтверждения возраста 18+ пользователей Morgan AI.
 
+**Документация Didit:** https://docs.didit.me
+
 ---
 
 ## Как это работает
 
 1. Пользователь нажимает «Подтвердить возраст 18+» → открывается модальное окно
 2. Нажимает «Начать верификацию» → бэкенд создаёт сессию через Didit API
-3. Открывается новая вкладка с формой Didit (загрузка документа/selfie)
+3. Открывается новая вкладка с формой Didit (загрузка документа / selfie)
 4. Пользователь проходит верификацию
-5. Didit отправляет webhook на наш сервер (`POST /api/kyc-webhook`)
+5. Didit отправляет webhook на `POST /api/kyc-webhook`
 6. Бэкенд устанавливает `kyc_verified = true` для пользователя
 7. При возврате на страницу настроек (`?kyc=done`) — статус обновляется
 
 ---
 
-## Регистрация и настройка в Didit
+## Настройка в Didit Business Console
 
 ### Шаг 1 — Создай аккаунт
 
-Зарегистрируйся на [didit.me](https://didit.me) как бизнес-клиент.
+Зарегистрируйся на [business.didit.me](https://business.didit.me).
 
-### Шаг 2 — Создай Application
+### Шаг 2 — Получи API Key
 
-В панели Didit → **Applications** → **New Application**:
-- Название: `Morgan AI`
-- Тип: `Web`
-- Redirect URL: `https://твой-домен.com/settings?kyc=done`
+В Didit Business Console:
+1. Выбери своё Application из dropdown
+2. Перейди в **API & Webhooks** в сайдбаре
+3. Скопируй **API Key** — это значение `DIDIT_API_KEY`
 
-Получишь **Client ID** и **Client Secret**.
+> **Важно:** API Key — это секрет. Храни только на сервере, никогда во фронтенде.
 
-### Шаг 3 — Создай Workflow (если ещё не создан)
+### Шаг 3 — Создай или найди Workflow
 
-В панели Didit → **Workflows** → **New Workflow**:
-- Выбери нужные шаги (например: Document + Liveness)
-- Сохрани → получишь **Workflow ID**
-
-Если у тебя уже есть готовый Workflow — просто скопируй его ID.
+В Didit → **Workflows** → **New Workflow**:
+- Добавь нужные шаги (например: Document Verification + Liveness Check)
+- Сохрани → скопируй **Workflow ID** — это значение `DIDIT_WORKFLOW_ID`
 
 ### Шаг 4 — Настрой Webhook
 
-В панели Didit → **Webhooks** → **Add Webhook**:
-- URL: `https://твой-домен.com/api/kyc-webhook`
-- Events: `session.approved`, `session.declined` (минимум `session.approved`)
-- Signing Secret: придумай или сгенерируй — это будет `DIDIT_WEBHOOK_SECRET`
+В Didit → **API & Webhooks** → **Add Webhook Destination**:
+- **URL:** `https://твой-домен.com/api/kyc-webhook`
+- **Events:** `status.updated` (минимум)
+- Скопируй **Webhook Secret** — это значение `DIDIT_WEBHOOK_SECRET`
 
 ---
 
 ## Переменные окружения
 
-Добавь в `.env` (или в переменные окружения Docker/Dokploy):
+Добавь в переменные окружения Docker/Dokploy (или `.env` локально):
 
 ```env
 # Didit KYC
-DIDIT_CLIENT_ID=your_client_id_here
-DIDIT_CLIENT_SECRET=your_client_secret_here
+DIDIT_API_KEY=your_api_key_here
 DIDIT_WORKFLOW_ID=your_workflow_id_here
 DIDIT_WEBHOOK_SECRET=your_webhook_signing_secret_here
 ```
 
-**Без этих переменных** KYC-кнопка вернёт ошибку «KYC сервис не настроен».
+Без `DIDIT_API_KEY` и `DIDIT_WORKFLOW_ID` — кнопка вернёт «KYC не настроен».  
+`DIDIT_WEBHOOK_SECRET` опционален, но настоятельно рекомендуется в продакшне.
 
 ---
 
@@ -68,77 +68,80 @@ DIDIT_WEBHOOK_SECRET=your_webhook_signing_secret_here
 
 | Метод | URL | Auth | Описание |
 |-------|-----|------|---------|
-| `POST` | `/api/kyc/session` | Требует JWT | Создаёт сессию верификации, возвращает `session_url` |
-| `POST` | `/api/kyc-webhook` | Публичный (подпись) | Принимает webhook от Didit |
+| `POST` | `/api/kyc/session` | JWT (httpOnly cookie) | Создаёт сессию, возвращает `session_url` |
+| `POST` | `/api/kyc-webhook` | Публичный (проверка подписи) | Принимает webhook от Didit |
 
 ### Ответ `POST /api/kyc/session`
 
 ```json
-{
-  "session_url": "https://verify.didit.me/session/...",
-  "session_id": "sess_..."
-}
+{ "session_url": "https://verification.didit.me/session/...", "session_id": "uuid" }
 ```
 
-или, если уже верифицирован:
+или, если пользователь уже верифицирован:
+
 ```json
-{
-  "already_verified": true
-}
+{ "already_verified": true }
 ```
 
-### Формат webhook от Didit
+### Payload webhook от Didit
 
 ```json
 {
+  "session_id": "uuid",
   "status": "Approved",
-  "vendor_data": "123",
-  "session_id": "sess_...",
-  "workflow_id": "wf_..."
+  "webhook_type": "status.updated",
+  "timestamp": 1627680000,
+  "vendor_data": "123"
 }
 ```
 
-`vendor_data` — это `userId` пользователя Morgan AI, переданный при создании сессии.
+`vendor_data` — это `userId` пользователя Morgan AI (передаётся при создании сессии).
+
+Возможные статусы: `Approved`, `Declined`, `In Review`, `In Progress`, `Not Started`, `Abandoned`.  
+Только `Approved` устанавливает `kyc_verified = true`.
 
 ---
 
 ## Безопасность webhook
 
-Бэкенд проверяет подпись запроса через HMAC-SHA256:
-- Заголовок: `x-signature`
-- Алгоритм: `HMAC-SHA256(DIDIT_WEBHOOK_SECRET, JSON.stringify(body))`
+Бэкенд проверяет подпись через метод **X-Signature-Simple** (рекомендован Didit для Express):
+
+- Заголовок подписи: `X-Signature-Simple`
+- Заголовок времени: `X-Timestamp`
+- Подписываемые данные: `"{timestamp}:{session_id}:{status}:{webhook_type}"`
+- Алгоритм: `HMAC-SHA256(DIDIT_WEBHOOK_SECRET, signedData)`
 
 Если `DIDIT_WEBHOOK_SECRET` не задан — проверка отключена (только для локальной разработки!).
 
 ---
 
-## Тестирование
+## Тестирование локально
 
-### Локально (без реального Didit)
-
-Для тестирования без реального прохождения верификации можно вручную вызвать webhook:
+### Эмулировать webhook вручную (без реального Didit)
 
 ```bash
 curl -X POST http://localhost:3001/api/kyc-webhook \
   -H "Content-Type: application/json" \
-  -d '{"status":"Approved","vendor_data":"1"}'
+  -d '{"status":"Approved","vendor_data":"1","session_id":"test","webhook_type":"status.updated"}'
 ```
 
-Это установит `kyc_verified = true` для пользователя с ID=1.
+Это установит `kyc_verified = true` для пользователя с `id = 1`.
 
 ### Проверить статус
 
 ```bash
-# После входа (получить cookie)
 curl http://localhost:3001/api/auth/me \
   -H "Cookie: morgan_token=..." | jq .kyc_verified
 ```
 
 ---
 
-## Дополнительно
+## Troubleshooting
 
-- Документация Didit API: https://docs.didit.me
-- Статусы сессий: `Approved`, `Declined`, `Expired`, `Pending`
-- Только `Approved` устанавливает `kyc_verified = true`
-- Верификацию нельзя «отменить» через UI — только через прямое обновление БД (для тестов)
+| Ошибка | Причина | Решение |
+|--------|---------|---------|
+| `KYC не настроен: DIDIT_API_KEY не задан` | Переменная не задана | Добавь `DIDIT_API_KEY` в env |
+| `Ошибка Didit (401)` | Неверный API Key | Проверь ключ в Didit Console |
+| `Ошибка Didit (403)` | API Key не имеет доступа к ресурсу | Проверь права ключа |
+| `Ошибка Didit (404)` | Неверный Workflow ID | Проверь `DIDIT_WORKFLOW_ID` |
+| `Invalid signature` в webhook | Неверный webhook secret | Сверь `DIDIT_WEBHOOK_SECRET` с Console |

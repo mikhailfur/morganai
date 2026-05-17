@@ -3,25 +3,7 @@ import crypto from 'crypto';
 import { config } from '../config';
 import { database } from '../database';
 
-// Получить access token Didit (client_credentials flow)
-async function getDigitAccessToken(): Promise<string> {
-  const resp = await fetch('https://apx.didit.me/auth/v2/token/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: config.diditClientId,
-      client_secret: config.diditClientSecret,
-    }).toString(),
-  });
-  if (!resp.ok) {
-    const errBody = await resp.text();
-    throw new Error(`Didit auth failed (${resp.status}): ${errBody}`);
-  }
-  const data = await resp.json() as { access_token: string };
-  if (!data.access_token) throw new Error('Didit auth: no access_token in response');
-  return data.access_token;
-}
+const DIDIT_API_BASE = 'https://verification.didit.me/v3';
 
 // Защищённый роутер — требует authMiddleware (регистрируется через /api/kyc)
 export const kycProtectedRouter = Router();
@@ -29,43 +11,38 @@ export const kycProtectedRouter = Router();
 // POST /api/kyc/session — создать сессию верификации
 kycProtectedRouter.post('/session', async (req: any, res: Response) => {
   try {
-    if (!config.diditClientId || !config.diditWorkflowId) {
-      res.status(503).json({ error: 'KYC сервис не настроен (DIDIT_CLIENT_ID / DIDIT_WORKFLOW_ID не заданы)' });
+    if (!config.diditApiKey) {
+      res.status(503).json({ error: 'KYC не настроен: DIDIT_API_KEY не задан' });
       return;
     }
-    if (!config.diditClientSecret) {
-      res.status(503).json({ error: 'KYC сервис не настроен (DIDIT_CLIENT_SECRET не задан)' });
+    if (!config.diditWorkflowId) {
+      res.status(503).json({ error: 'KYC не настроен: DIDIT_WORKFLOW_ID не задан' });
       return;
     }
 
     const userId = req.user.userId;
     const user = await database.getUserById(userId);
-    if (!user) { res.status(404).json({ error: 'Не найден' }); return; }
+    if (!user) { res.status(404).json({ error: 'Пользователь не найден' }); return; }
 
     if (user.kyc_verified) {
       res.json({ already_verified: true });
       return;
     }
 
-    const accessToken = await getDigitAccessToken();
-
-    // Строим callback из реального хоста запроса как фолбэк
     const origin = config.clientUrl || `${req.protocol}://${req.get('host')}`;
-    const callbackUrl = `${origin}/settings?kyc=done`;
 
-    const sessionBody = {
-      workflow_id: config.diditWorkflowId,
-      vendor_data: String(userId),
-      callback: callbackUrl,
-    };
-
-    const sessionResp = await fetch('https://apx.didit.me/v1/session/', {
+    const sessionResp = await fetch(`${DIDIT_API_BASE}/session/`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': config.diditApiKey,
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
-      body: JSON.stringify(sessionBody),
+      body: JSON.stringify({
+        workflow_id: config.diditWorkflowId,
+        vendor_data: String(userId),
+        callback: `${origin}/settings?kyc=done`,
+      }),
     });
 
     if (!sessionResp.ok) {
@@ -76,17 +53,16 @@ kycProtectedRouter.post('/session', async (req: any, res: Response) => {
     }
 
     const session = await sessionResp.json() as Record<string, any>;
-    // Didit может возвращать url или session_url в зависимости от версии API
-    const sessionUrl = session.url || session.session_url;
-    const sessionId = session.session_id || session.id;
+    const sessionUrl: string = session.url;
+    const sessionId: string = session.session_id;
 
     if (!sessionUrl) {
-      console.error('Didit session response missing url:', session);
+      console.error('Didit: no url in response:', session);
       res.status(502).json({ error: 'Didit не вернул ссылку на верификацию' });
       return;
     }
 
-    res.json({ session_url: sessionUrl, session_id: sessionId });
+    res.status(201).json({ session_url: sessionUrl, session_id: sessionId });
   } catch (error: any) {
     console.error('KYC session error:', error?.message || error);
     res.status(500).json({ error: error?.message || 'Внутренняя ошибка KYC' });
@@ -99,15 +75,21 @@ export const kycWebhookRouter = Router();
 // POST /api/kyc-webhook — принимает уведомления от Didit
 kycWebhookRouter.post('/', async (req: Request, res: Response) => {
   try {
-    // Верификация подписи webhook (если секрет задан)
+    // Верификация подписи через X-Signature-Simple (рекомендуется Didit для Express)
+    // Подпись: HMAC-SHA256("{timestamp}:{session_id}:{status}:{webhook_type}")
     if (config.diditWebhookSecret) {
-      const signature = req.headers['x-signature'] as string || '';
-      const payload = JSON.stringify(req.body);
+      const timestamp = req.headers['x-timestamp'] as string || '';
+      const sigSimple = req.headers['x-signature-simple'] as string || '';
+
+      const { session_id, status, webhook_type } = req.body;
+      const signedData = `${timestamp}:${session_id}:${status}:${webhook_type}`;
       const expected = crypto
         .createHmac('sha256', config.diditWebhookSecret)
-        .update(payload)
+        .update(signedData)
         .digest('hex');
-      if (signature !== expected) {
+
+      if (!crypto.timingSafeEqual(Buffer.from(sigSimple), Buffer.from(expected))) {
+        console.warn('KYC webhook: invalid signature');
         res.status(401).json({ error: 'Invalid signature' });
         return;
       }
@@ -122,15 +104,14 @@ kycWebhookRouter.post('/', async (req: Request, res: Response) => {
       return;
     }
 
-    // Didit отправляет status 'Approved' при успешной верификации
-    if (status === 'Approved' || status === 'APPROVED') {
+    if (status === 'Approved') {
       await database.setUserKycVerified(userId);
       console.log(`KYC verified for user ${userId}`);
     }
 
     res.json({ received: true });
-  } catch (error) {
-    console.error('KYC webhook error:', error);
-    res.status(500).json({ error: 'Ошибка' });
+  } catch (error: any) {
+    console.error('KYC webhook error:', error?.message || error);
+    res.status(500).json({ error: 'Webhook processing error' });
   }
 });
