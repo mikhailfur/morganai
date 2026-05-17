@@ -28,9 +28,12 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchUser() {
     try {
       const res = await fetch(`${API}/auth/me`, { credentials: 'include' });
-      if (!res.ok) { user.value = null; return; }
+      if (!res.ok) {
+        if (res.status === 401) user.value = null;
+        return;
+      }
       user.value = await res.json();
-    } catch { user.value = null; }
+    } catch { /* network error — don't clear authenticated state */ }
   }
 
   async function register(email: string, username: string, password: string) {

@@ -61,7 +61,7 @@ function onEditorDeleted(id: number) {
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="modal-overlay" @click.self="emit('close')">
+    <div v-if="visible && !showEditor" class="modal-overlay" @click.self="emit('close')">
       <div class="modal-box" style="max-width: 640px; width: 100%; padding: 0; overflow: hidden;">
 
         <!-- Modal header -->

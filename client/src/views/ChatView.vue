@@ -111,12 +111,28 @@ const modes = [
   { id: 'study',       sym: 'ii',  name: 'Учёба',      desc: 'Репетитор. Помогает с заданиями и объясняет.' },
   { id: 'work',        sym: 'iii', name: 'Работа',     desc: 'Деловой помощник. Письма, задачи, переговоры.' },
   { id: 'psychologist',sym: 'iv',  name: 'Психолог',   desc: 'Эмоциональная поддержка. Без оценок и советов.' },
-  { id: 'nsfw',        sym: 'v',   name: 'NSFW · 18+', desc: 'Без фильтра. Только для Premium.', premium: true },
+  { id: 'nsfw',        sym: 'v',   name: 'NSFW · 18+', desc: 'Без фильтра. Требуется Premium или подтверждение возраста.', restricted: true },
 ]
 
+const nsfwGeoBlocked = ref(false)
+const modeError = ref('')
+
 async function setMode(mode: string) {
-  await auth.updateSettings({ behavior_mode: mode })
-  showModes.value = false
+  try {
+    await auth.updateSettings({ behavior_mode: mode })
+    nsfwGeoBlocked.value = false
+    modeError.value = ''
+    showModes.value = false
+  } catch (e: any) {
+    const msg: string = e.message || ''
+    if (msg.includes('регион') || msg.includes('geo') || msg.includes('region')) {
+      nsfwGeoBlocked.value = true
+      modeError.value = 'NSFW недоступен в вашем регионе'
+    } else {
+      modeError.value = msg
+    }
+    setTimeout(() => modeError.value = '', 4000)
+  }
 }
 
 async function switchCharacter(slug: string) {
@@ -167,21 +183,8 @@ async function handleLogout() {
       <div style="padding: 12px 20px 6px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--accent); font-weight: 700; opacity: 0.8;">Меню</div>
 
       <!-- Characters -->
-      <div style="flex: 1; overflow-y: auto;">
-        <!-- Current character display -->
-        <button
-          @click="showCharacterPicker = true; sidebarOpen = false"
-          class="nav-item"
-          style="width: 100%; text-align: left; border-bottom: var(--border);"
-        >
-          <div style="font-size: 14px; line-height: 1.2; display: flex; align-items: center; justify-content: space-between;">
-            <span>{{ currentCharObj?.name || 'Морган' }}</span>
-            <span style="font-family: var(--font-mono); font-size: 9px; opacity: 0.6; letter-spacing: 1px;">↕ сменить</span>
-          </div>
-          <div style="font-family: var(--font-mono); font-size: 9px; opacity: 0.6; margin-top: 3px; letter-spacing: 1px; text-transform: uppercase;">
-            активный персонаж
-          </div>
-        </button>
+      <div class="sidebar-scroll">
+        <div style="padding: 8px 20px 4px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.4px; text-transform: uppercase; opacity: 0.5;">Персонажи</div>
         <!-- Canonical quick list -->
         <button
           v-for="c in chat.characters" :key="c.slug"
@@ -193,17 +196,24 @@ async function handleLogout() {
             {{ c.name }}
             <span v-if="c.is_premium" style="font-family: var(--font-mono); font-size: 9px; color: var(--meta); letter-spacing: 1px;">✦</span>
           </div>
-          <div style="font-family: var(--font-mono); font-size: 9px; opacity: 0.6; margin-top: 3px; letter-spacing: 1px; text-transform: uppercase; font-weight: 400;">
-            {{ c.description?.slice(0, 28) }}{{ (c.description?.length ?? 0) > 28 ? '...' : '' }}
+          <div style="font-family: var(--font-mono); font-size: 9px; opacity: 0.6; margin-top: 2px; letter-spacing: 1px; text-transform: uppercase; font-weight: 400;">
+            {{ c.description?.slice(0, 26) }}{{ (c.description?.length ?? 0) > 26 ? '...' : '' }}
           </div>
         </button>
-        <!-- All characters button -->
+        <!-- User character active indicator -->
+        <div v-if="currentCharacter.startsWith('uc:')" class="nav-item active" style="cursor: default; pointer-events: none;">
+          <div style="font-size: 14px; line-height: 1.2; display: flex; align-items: center; justify-content: space-between;">
+            <span>{{ currentCharObj?.name || 'Мой персонаж' }}</span>
+            <span style="font-family: var(--font-mono); font-size: 9px; color: var(--meta); letter-spacing: 1px;">мой</span>
+          </div>
+        </div>
+        <!-- Open character picker -->
         <button
           @click="showCharacterPicker = true; sidebarOpen = false"
           class="nav-item"
-          style="width: 100%; text-align: left; opacity: 0.7; font-size: 12px;"
+          style="width: 100%; text-align: left; font-size: 12px; opacity: 0.65;"
         >
-          ✦ Все персонажи и мои...
+          ✦ Все персонажи...
         </button>
       </div>
 
@@ -406,16 +416,17 @@ async function handleLogout() {
             ">✕</button>
           </div>
 
+          <div v-if="modeError" style="margin-bottom: 14px; padding: 8px 12px; background: var(--bg-alt); border-left: 3px solid var(--accent2); font-size: 12px; color: var(--accent2); font-family: var(--font-mono);">{{ modeError }}</div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: var(--border);">
             <div
               v-for="(m, i) in modes" :key="m.id"
-              @click="m.premium && !auth.isPremium ? null : setMode(m.id)"
+              @click="m.restricted && !auth.canNsfw ? null : setMode(m.id)"
               :class="['mode-card', auth.user?.behavior_mode === m.id ? 'active' : '']"
               :style="{
                 borderTop: i >= 2 ? 'var(--border)' : 'none',
                 borderLeft: i % 2 ? 'var(--border)' : 'none',
-                opacity: m.premium && !auth.isPremium ? 0.5 : 1,
-                cursor: m.premium && !auth.isPremium ? 'not-allowed' : 'pointer',
+                opacity: m.restricted && !auth.canNsfw ? 0.5 : 1,
+                cursor: m.restricted && !auth.canNsfw ? 'not-allowed' : 'pointer',
               }"
             >
               <div style="display: flex; justify-content: space-between; align-items: flex-start;">
@@ -425,7 +436,8 @@ async function handleLogout() {
                     <span style="font-family: var(--font-display); font-weight: 500; font-size: 18px; color: var(--fg);">{{ m.name }}</span>
                   </div>
                   <p style="font-family: var(--font-display); font-size: 13px; line-height: 1.4; margin-top: 6px; color: var(--fg); opacity: 0.7; font-style: italic;">{{ m.desc }}</p>
-                  <div v-if="m.premium" style="margin-top: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.4px; color: var(--meta); text-transform: uppercase;">✦ Только Premium</div>
+                  <div v-if="m.restricted && !auth.canNsfw" style="margin-top: 6px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.4px; color: var(--meta); text-transform: uppercase;">✦ Premium или верификация 18+</div>
+                  <div v-if="m.restricted && nsfwGeoBlocked" style="margin-top: 4px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.4px; color: var(--accent2); text-transform: uppercase;">✖ Недоступно в вашем регионе</div>
                 </div>
                 <div v-if="auth.user?.behavior_mode === m.id" style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.4px; color: var(--accent); margin-left: 8px;">● АКТИВНО</div>
               </div>
@@ -460,6 +472,15 @@ async function handleLogout() {
 .overlay-fade-leave-active { transition: opacity 0.25s; }
 .overlay-fade-enter-from,
 .overlay-fade-leave-to { opacity: 0; }
+
+/* Sidebar scroll — hidden scrollbar */
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.sidebar-scroll::-webkit-scrollbar { display: none; }
 
 /* Root layout — dvh for proper mobile browser chrome handling */
 .chat-root {

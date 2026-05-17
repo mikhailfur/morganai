@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useThemeStore } from '../stores/theme'
+import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 
 const auth = useAuthStore()
 const theme = useThemeStore()
@@ -209,6 +210,11 @@ async function submitDelete() {
         <div v-if="auth.isKycVerified && !auth.isPremium" style="margin-top: 10px; font-family: var(--font-mono); font-size: 10px; color: var(--meta); letter-spacing: 1.2px; text-transform: uppercase;">
           ✓ Возраст подтверждён через Didit
         </div>
+      </div>
+
+      <!-- Language -->
+      <div style="margin-top: 24px; padding: 22px; border: var(--border); background: var(--bg-alt);">
+        <LanguageSwitcher />
       </div>
 
       <!-- Bottom row -->
