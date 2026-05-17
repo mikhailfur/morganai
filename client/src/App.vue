@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { RouterView } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import BackgroundOrbs from './components/BackgroundOrbs.vue'
 import CookieBanner from './components/CookieBanner.vue'
@@ -11,10 +10,6 @@ onMounted(() => auth.fetchAppConfig())
 
 <template>
   <BackgroundOrbs />
-  <RouterView v-slot="{ Component }">
-    <Transition name="page" mode="out-in">
-      <component :is="Component" :key="$route.fullPath" />
-    </Transition>
-  </RouterView>
+  <RouterView :key="$route.fullPath" />
   <CookieBanner />
 </template>
