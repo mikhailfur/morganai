@@ -33,17 +33,17 @@ function accept() {
   align-items: center;
   gap: 16px;
   padding: 14px 20px;
-  background: var(--bg-alt);
-  border: var(--border);
-  box-shadow: var(--shadow-box);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px -8px rgb(0 0 0 / 0.5);
   max-width: min(600px, calc(100vw - 32px));
   width: 100%;
-  border-radius: 2px;
+  border-radius: var(--radius-xl);
 }
 .cookie-text {
   font-size: 13px;
   line-height: 1.5;
-  color: var(--fg-dim);
+  color: var(--fg-muted);
   flex: 1;
 }
 .cookie-text strong { color: var(--fg); }

@@ -1,69 +1,61 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useThemeStore } from '../stores/theme'
 import { useAuthStore } from '../stores/auth'
 
-const theme = useThemeStore()
 const auth = useAuthStore()
 const billing = ref<'monthly' | 'yearly'>('monthly')
 
 const tiers = [
   {
     id: 'free',
-    sym: 'I',
-    kanji: '無',
     name: 'Базовый',
     price: { monthly: 0, yearly: 0 },
-    sub: '/ навсегда',
-    best: 'Попробовать',
+    period: '/ навсегда',
+    desc: 'Попробуй без обязательств',
     features: [
-      '50 сообщений в день',
-      '3 базовых персонажа',
-      'Текстовый чат',
-      'История 30 дней',
+      { text: '50 сообщений в день', ok: true },
+      { text: '3 базовых персонажа', ok: true },
+      { text: 'Текстовый чат', ok: true },
+      { text: 'История 30 дней', ok: true },
+      { text: 'Голосовые ответы', ok: false },
+      { text: 'NSFW режим', ok: false },
     ],
     cta: 'Начать бесплатно',
-    featured: false,
+    popular: false,
   },
   {
     id: 'premium',
-    sym: 'II',
-    kanji: '✦',
     name: 'Premium',
     price: { monthly: 299, yearly: 239 },
-    sub: '₽ / месяц',
-    best: 'Самый популярный',
+    period: '₽ / месяц',
+    desc: 'Полный доступ к платформе',
     features: [
-      'Безлимит сообщений',
-      'Все персонажи',
-      'Голос (20 / 5 часов)',
-      'NSFW режим (18+)',
-      'Vision · фото',
-      'Без рекламы',
-      'Память навсегда',
+      { text: 'Безлимит сообщений', ok: true },
+      { text: 'Все персонажи', ok: true },
+      { text: 'Голос (20 / 5 часов)', ok: true },
+      { text: 'NSFW режим (18+)', ok: true },
+      { text: 'Vision · фото', ok: true },
+      { text: 'Память навсегда', ok: true },
     ],
     cta: 'Оформить Premium',
-    featured: true,
+    popular: true,
   },
   {
     id: 'premium_plus',
-    sym: 'III',
-    kanji: '極',
     name: 'Premium+',
     price: { monthly: 599, yearly: 479 },
-    sub: '₽ / месяц',
-    best: 'Максимум',
+    period: '₽ / месяц',
+    desc: 'Максимальные возможности',
     features: [
-      'Всё из Premium',
-      'Безлимит голоса',
-      'Расширенный контекст (100к токенов)',
-      'Приоритетная генерация',
-      'Эксклюзивные персонажи',
-      'Ранний доступ к новому',
-      'Личный значок в чате',
+      { text: 'Всё из Premium', ok: true },
+      { text: 'Безлимит голоса', ok: true },
+      { text: 'Контекст 100к токенов', ok: true },
+      { text: 'Приоритетная генерация', ok: true },
+      { text: 'Эксклюзивные персонажи', ok: true },
+      { text: 'Ранний доступ к новому', ok: true },
     ],
     cta: 'Оформить Premium+',
-    featured: false,
+    popular: false,
   },
 ]
 
@@ -71,209 +63,370 @@ function handlePurchase(tierId: string) {
   if (tierId === 'free') {
     window.location.href = '/register'
   } else {
-    alert('Оплата — скоро. Свяжитесь с нами: support@morgan.ai')
+    alert('Оплата — скоро. Свяжитесь: support@morgan.ai')
   }
 }
 </script>
 
 <template>
-  <div style="min-height: 100vh; background: var(--bg); color: var(--fg);">
+  <div class="pricing-root">
 
     <!-- NAV -->
-    <nav style="
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 20px 48px;
-      border-bottom: var(--border);
-    ">
-      <router-link to="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
-        <img :src="'/logo.svg'" alt="Morgan" style="height: 44px; border-radius: 6px; display: block;" />
-        <span style="font-family: var(--font-display); font-weight: 600; font-size: 24px; color: var(--accent);">Morgan</span>
+    <nav class="pricing-nav">
+      <router-link to="/" class="nav-logo">
+        <div class="logo-box">M</div>
+        <span class="logo-text">Morgan AI</span>
       </router-link>
-      <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
         <router-link v-if="auth.isAuthenticated" to="/chat" class="btn-ghost btn-sm" style="text-decoration: none;">В чат</router-link>
         <router-link v-else to="/login" class="btn-ghost btn-sm" style="text-decoration: none;">Войти</router-link>
-        <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}</button>
       </div>
     </nav>
 
-    <div style="padding: 40px 48px;">
-      <!-- Heading + billing toggle -->
-      <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px;">
-        <div>
-          <div class="editorial-label" style="color: var(--accent2);">
-            <span style="opacity: 0.55;">III</span>
-            ТАРИФЫ · ВЫБОР ПУТИ
-          </div>
-          <div class="display-heading" style="font-size: clamp(36px, 5vw, 80px); margin-top: 14px;">
-            Сколько <span style="font-style: italic; color: var(--accent3);">стоит</span> компания?
-          </div>
-        </div>
-
+    <div class="pricing-content">
+      <!-- Heading -->
+      <div class="pricing-heading-wrap animate-fade-in">
+        <div class="section-label">Тарифы</div>
+        <h1 class="pricing-heading">
+          Выбери свой<br />
+          <span class="gradient-text">путь</span>
+        </h1>
         <!-- Billing toggle -->
-        <div style="display: flex; gap: 0; border: var(--border);">
+        <div class="billing-toggle">
           <button
             @click="billing = 'monthly'"
-            :style="{
-              padding: '8px 20px',
-              background: billing === 'monthly' ? 'var(--accent)' : 'transparent',
-              color: billing === 'monthly' ? 'var(--bg)' : 'var(--fg)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '11px',
-              letterSpacing: '1.4px',
-              textTransform: 'uppercase',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: billing === 'monthly' ? '700' : '400',
-            }"
+            :class="['toggle-btn', billing === 'monthly' ? 'active' : '']"
           >Помесячно</button>
           <button
             @click="billing = 'yearly'"
-            :style="{
-              padding: '8px 20px',
-              background: billing === 'yearly' ? 'var(--accent)' : 'transparent',
-              color: billing === 'yearly' ? 'var(--bg)' : 'var(--fg)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '11px',
-              letterSpacing: '1.4px',
-              textTransform: 'uppercase',
-              border: 'none',
-              borderLeft: 'var(--border)',
-              cursor: 'pointer',
-              fontWeight: billing === 'yearly' ? '700' : '400',
-            }"
+            :class="['toggle-btn', billing === 'yearly' ? 'active' : '']"
           >Ежегодно · −20%</button>
         </div>
       </div>
 
-      <!-- Pricing cards -->
-      <div style="margin-top: 40px; display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 22px; align-items: flex-start;">
+      <!-- Cards -->
+      <div class="tiers-grid animate-fade-in-1">
         <div
           v-for="t in tiers" :key="t.id"
-          :class="['pricing-card', t.featured ? 'featured' : '']"
+          :class="['tier-card', 'card-hover', t.popular ? 'tier-popular' : '']"
         >
-          <!-- Featured badge -->
-          <div v-if="t.featured" style="
-            position: absolute;
-            top: -14px;
-            right: 20px;
-            background: var(--accent3);
-            color: var(--fg);
-            font-family: var(--font-mono);
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 1.2px;
-            padding: 4px 12px;
-            border: var(--border);
-            transform: rotate(2deg);
-          ">{{ t.best }}</div>
+          <!-- Popular badge -->
+          <div v-if="t.popular" class="popular-badge">Популярный</div>
 
-          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-            <div>
-              <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--accent2); font-weight: 700;">
-                {{ t.featured ? t.best.toUpperCase() : 'OP. ' + t.sym }}
-              </div>
-              <div style="font-family: var(--font-display); font-weight: 600; font-size: 32px; line-height: 1; margin-top: 6px; letter-spacing: -0.5px;">{{ t.name }}</div>
-            </div>
-            <div style="font-family: var(--font-display); font-weight: 600; font-size: 38px; line-height: 0.8; color: var(--accent3);">{{ t.kanji }}</div>
+          <div class="tier-header">
+            <div class="tier-name">{{ t.name }}</div>
+            <div class="tier-desc">{{ t.desc }}</div>
           </div>
 
-          <!-- Price -->
-          <div style="margin-top: 22px; display: flex; align-items: baseline; gap: 8px;">
-            <span style="font-family: var(--font-display); font-weight: 200; font-size: 60px; line-height: 0.9; letter-spacing: -2px;">
-              {{ t.price[billing] }}
-            </span>
-            <span style="font-family: var(--font-ui); font-size: 13px; opacity: 0.7;">{{ t.price[billing] > 0 ? t.sub : '/ навсегда' }}</span>
+          <div class="tier-price">
+            <span class="price-amount">{{ t.price[billing] }}</span>
+            <span class="price-period">{{ t.price[billing] > 0 ? t.period : '/ навсегда' }}</span>
           </div>
 
-          <div style="margin-top: 20px; height: 2px; background: var(--rule); opacity: 0.5;"></div>
+          <div class="tier-divider"></div>
 
-          <!-- Features -->
-          <div style="margin-top: 18px; display: flex; flex-direction: column; gap: 12px;">
-            <div v-for="f in t.features" :key="f" style="display: flex; gap: 10px; align-items: flex-start;">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" :stroke="t.featured ? 'var(--accent3)' : 'var(--accent)'" stroke-width="2.2" stroke-linecap="round" style="flex-shrink: 0; margin-top: 4px;">
-                <path d="M2 7l3.5 3.5L12 3"/>
+          <div class="tier-features">
+            <div v-for="f in t.features" :key="f.text" class="tier-feature">
+              <svg v-if="f.ok" width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="t.popular ? '#a78bfa' : '#7c3aed'" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;">
+                <path d="M20 6L9 17l-5-5"/>
               </svg>
-              <span style="font-family: var(--font-display); font-size: 15px; line-height: 1.35;">{{ f }}</span>
+              <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fg-subtle)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px; opacity: 0.4;">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+              <span :style="{ color: f.ok ? 'var(--fg-muted)' : 'var(--fg-subtle)', opacity: f.ok ? 1 : 0.5 }">{{ f.text }}</span>
             </div>
           </div>
 
-          <button
-            @click="handlePurchase(t.id)"
-            style="
-              margin-top: 24px;
-              width: 100%;
-              padding: 14px;
-              font-family: var(--font-ui);
-              font-weight: 700;
-              font-size: 13px;
-              letter-spacing: 0.3px;
-              cursor: pointer;
-              transition: transform 0.15s;
-            "
-            :style="{
-              background: t.featured ? 'var(--bg)' : 'var(--accent)',
-              color: t.featured ? 'var(--accent)' : 'var(--bg)',
-              border: 'var(--border)',
-              boxShadow: 'var(--shadow-sm)',
-            }"
-          >{{ t.cta }} →</button>
+          <button @click="handlePurchase(t.id)" :class="['tier-cta', t.popular ? 'btn-primary' : 'btn-ghost']" style="width: 100%; padding: 12px;">
+            {{ t.cta }}
+          </button>
         </div>
       </div>
 
       <!-- Footer note -->
-      <div style="
-        margin-top: 36px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-family: var(--font-mono);
-        font-size: 10px;
-        letter-spacing: 1.4px;
-        text-transform: uppercase;
-        color: var(--fg);
-        opacity: 0.55;
-        flex-wrap: wrap;
-        gap: 12px;
-      ">
+      <div class="pricing-note animate-fade-in-2">
         <span>★ Ежемесячная подписка. Отмена в один клик.</span>
         <span>Оплата: карта · СБП · Telegram Stars</span>
       </div>
     </div>
 
     <!-- Footer -->
-    <footer style="
-      border-top: var(--border);
-      padding: 20px 48px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 40px;
-    ">
-      <router-link to="/" style="font-family: var(--font-display); font-weight: 600; font-size: 16px; color: var(--accent); text-decoration: none;">Morgan 夢</router-link>
-      <div style="display: flex; gap: 24px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--fg); opacity: 0.5; flex-wrap: wrap;">
-        <router-link to="/legal" style="color: inherit; text-decoration: none; opacity: 0.8;">Политика конфиденциальности</router-link>
-        <router-link to="/legal/oferta" style="color: inherit; text-decoration: none; opacity: 0.8;">Оферта</router-link>
-        <router-link to="/legal/refund" style="color: inherit; text-decoration: none; opacity: 0.8;">Возврат средств</router-link>
-        <span>© 2026 Morgan AI</span>
+    <footer class="pricing-footer">
+      <router-link to="/" class="footer-logo">
+        <div class="logo-box-sm">M</div>
+        <span>Morgan AI</span>
+      </router-link>
+      <div class="footer-links">
+        <router-link to="/legal" class="footer-link">Политика конфиденциальности</router-link>
+        <router-link to="/legal/oferta" class="footer-link">Оферта</router-link>
+        <router-link to="/legal/refund" class="footer-link">Возврат средств</router-link>
+        <span class="footer-copy">© 2026 Morgan AI</span>
       </div>
     </footer>
-
   </div>
 </template>
 
 <style scoped>
+.pricing-root {
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+.pricing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 48px;
+  height: 56px;
+  border-bottom: 1px solid var(--border);
+  background: rgb(9 5 20 / 0.8);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+.logo-box {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+}
+.logo-box-sm {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  color: #fff;
+}
+.logo-text {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--fg);
+}
+.pricing-content {
+  padding: 48px 48px 0;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.pricing-heading-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.pricing-heading {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: clamp(36px, 5vw, 64px);
+  letter-spacing: -0.03em;
+  line-height: 1.0;
+  color: var(--fg);
+}
+.gradient-text {
+  background: linear-gradient(135deg, #c4b5fd 0%, #e879f9 50%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.billing-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.toggle-btn {
+  padding: 7px 18px;
+  border: none;
+  background: transparent;
+  color: var(--fg-subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.toggle-btn.active {
+  background: rgb(124 58 237 / 0.2);
+  color: var(--accent-soft);
+}
+
+.tiers-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr 1fr;
+  gap: 16px;
+  align-items: flex-start;
+}
+.tier-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  position: relative;
+  transition: all 0.2s;
+}
+.tier-popular {
+  border-color: rgb(124 58 237 / 0.4) !important;
+  box-shadow: 0 0 48px -8px rgb(124 58 237 / 0.4);
+}
+.tier-popular:hover {
+  box-shadow: 0 0 56px -8px rgb(124 58 237 / 0.6) !important;
+}
+.popular-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 14px;
+  border-radius: var(--radius-2xl);
+  white-space: nowrap;
+  box-shadow: 0 4px 16px -4px rgb(124 58 237 / 0.5);
+}
+.tier-header { margin-bottom: 20px; }
+.tier-name {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+.tier-desc {
+  font-size: 13px;
+  color: var(--fg-muted);
+  margin-top: 4px;
+}
+.tier-price {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+.price-amount {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 48px;
+  letter-spacing: -0.04em;
+  color: var(--fg);
+  line-height: 1;
+}
+.price-period {
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+.tier-divider {
+  height: 1px;
+  background: var(--border);
+  margin-bottom: 20px;
+}
+.tier-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.tier-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.tier-cta {
+  display: block;
+  text-align: center;
+}
+
+.pricing-note {
+  margin-top: 28px;
+  padding-bottom: 40px;
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pricing-footer {
+  border-top: 1px solid var(--border);
+  padding: 20px 48px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.footer-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--fg-muted);
+}
+.footer-links {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.footer-link {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.footer-link:hover { color: var(--fg-muted); }
+.footer-copy {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-subtle);
+}
+
 @media (max-width: 768px) {
-  nav { padding: 16px 20px !important; }
-  div[style*="padding: 40px 48px"] { padding: 24px 20px !important; }
-  div[style*="grid-template-columns: 1fr 1.15fr 1fr"] {
-    grid-template-columns: 1fr !important;
-    gap: 20px !important;
-  }
-  .pricing-card.featured { transform: none !important; }
-  footer { padding: 16px 20px !important; }
+  .pricing-nav { padding: 0 16px; }
+  .pricing-content { padding: 32px 16px 0; }
+  .tiers-grid { grid-template-columns: 1fr; gap: 16px; }
+  .pricing-footer { padding: 20px 16px; }
+  .pricing-note { flex-direction: column; gap: 6px; }
 }
 </style>

@@ -1,8 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useThemeStore } from '../stores/theme'
-
-const theme = useThemeStore()
 
 const activeTab = ref<'overview' | 'users' | 'subscriptions' | 'limits' | 'events' | 'finance'>('overview')
 
@@ -79,11 +76,11 @@ const eventLabels: Record<string, string> = {
 }
 function eventLabel(action: string) { return eventLabels[action] || action }
 function eventColor(action: string) {
-  if (action.includes('ban'))         return 'var(--accent2)'
-  if (action.includes('kyc_geo'))     return 'var(--accent2)'
-  if (action.includes('kyc'))         return 'var(--accent)'
-  if (action.includes('subscription') || action.includes('premium')) return 'color-mix(in srgb, var(--accent) 80%, var(--fg))'
-  return 'var(--meta)'
+  if (action.includes('ban'))         return 'var(--danger)'
+  if (action.includes('kyc_geo'))     return 'var(--danger)'
+  if (action.includes('kyc'))         return 'var(--accent-soft)'
+  if (action.includes('subscription') || action.includes('premium')) return 'var(--accent-soft)'
+  return 'var(--fg-subtle)'
 }
 
 // Users tab
@@ -171,31 +168,28 @@ const statCards = [
 </script>
 
 <template>
-  <div style="min-height: 100vh; background: var(--bg); color: var(--fg);">
+  <div style="min-height: 100vh; background: var(--bg); color: var(--fg); position: relative; z-index: 1;">
 
     <!-- Header -->
-    <header style="display: flex; justify-content: space-between; align-items: flex-end; padding: 24px 40px 0; border-bottom: var(--border);">
-      <div style="padding-bottom: 20px;">
-        <router-link to="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none; margin-bottom: 14px;">
-          <img :src="'/logo.svg'" alt="Morgan" style="height: 40px; border-radius: 5px; display: block;" />
-          <span style="font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--accent);">Morgan</span>
-        </router-link>
-        <div class="editorial-label" style="color: var(--accent2);">
-          <span style="opacity: 0.55;">✦</span>
-          ADMIN · УПРАВЛЕНИЕ
-        </div>
-        <div class="display-heading" style="font-size: clamp(28px, 4vw, 48px); margin-top: 8px;">
-          Панель <span style="font-style: italic; color: var(--accent3);">управления.</span>
-        </div>
-      </div>
-      <div style="display: flex; gap: 10px; align-items: center; padding-bottom: 20px;">
+    <header style="display: flex; justify-content: space-between; align-items: center; padding: 0 40px; height: 56px; border-bottom: 1px solid var(--border); background: rgb(9 5 20 / 0.8); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 100;">
+      <router-link to="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
+        <div style="width: 30px; height: 30px; border-radius: var(--radius-md); background: linear-gradient(135deg, #7c3aed, #6366f1); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #fff;">M</div>
+        <span style="font-weight: 600; font-size: 16px; color: var(--fg);">Morgan AI</span>
+        <span style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-subtle); padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm);">Admin</span>
+      </router-link>
+      <div style="display: flex; gap: 10px; align-items: center;">
         <router-link to="/chat" class="btn-ghost btn-sm" style="text-decoration: none;">← Чат</router-link>
-        <button @click="theme.toggle()" class="theme-toggle">{{ theme.isDark ? 'СВЕТ' : 'НОЧЬ' }}</button>
       </div>
     </header>
 
+    <!-- Page title -->
+    <div style="padding: 24px 40px 0;">
+      <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-subtle); margin-bottom: 8px;">✦ Admin · Управление</div>
+      <h1 style="font-family: var(--font-ui); font-weight: 700; font-size: clamp(24px, 4vw, 40px); letter-spacing: -0.03em; color: var(--fg); margin: 0 0 20px;">Панель управления</h1>
+    </div>
+
     <!-- Tabs -->
-    <div style="display: flex; border-bottom: var(--border); background: var(--bg-alt); padding: 0 40px; overflow-x: auto;">
+    <div style="display: flex; border-bottom: 1px solid var(--border); background: var(--surface); padding: 0 40px; overflow-x: auto;">
       <button
         v-for="t in [['overview','Обзор'],['users','Пользователи'],['subscriptions','Подписки'],['limits','Лимиты'],['events','Лог событий'],['finance','Финансы']]"
         :key="t[0]"
@@ -209,13 +203,10 @@ const statCards = [
 
       <!-- ── OVERVIEW ── -->
       <div v-if="activeTab === 'overview'">
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: var(--border);">
-          <div v-for="(s, i) in statCards" :key="s.label" class="stat-card" :style="{ borderLeft: i > 0 ? 'var(--border)' : 'none' }">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-              <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.6px; color: var(--meta);">{{ s.label }}</div>
-              <div style="font-family: var(--font-display); font-weight: 600; font-size: 24px; color: var(--accent2); line-height: 0.8;">{{ s.kanji }}</div>
-            </div>
-            <div style="font-family: var(--font-display); font-weight: 200; font-size: 44px; color: var(--fg); margin-top: 10px; letter-spacing: -1.5px; line-height: 0.95;">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+          <div v-for="s in statCards" :key="s.label" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 20px 24px;">
+            <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-subtle); margin-bottom: 12px;">{{ s.label }}</div>
+            <div style="font-family: var(--font-ui); font-weight: 700; font-size: 40px; color: var(--fg); letter-spacing: -0.04em; line-height: 1;">
               {{ (stats as any)[s.field] || 0 }}
             </div>
           </div>
@@ -229,17 +220,17 @@ const statCards = [
             <span style="opacity: 0.55;">02</span>
             ПОЛЬЗОВАТЕЛИ ({{ users.length }})
           </div>
-          <div style="display: flex; gap: 0; border: var(--border);">
-            <span v-for="(f, i) in ['все', 'premium', 'free', 'новые']" :key="f" @click="filter = f" class="filter-tab" :class="{ active: filter === f }" :style="{ borderLeft: i > 0 ? 'var(--border)' : 'none' }">{{ f }}</span>
+          <div style="display: flex; gap: 0; border: 1px solid var(--border);">
+            <span v-for="(f, i) in ['все', 'premium', 'free', 'новые']" :key="f" @click="filter = f" class="filter-tab" :class="{ active: filter === f }" :style="{ borderLeft: i > 0 ? '1px solid var(--border)' : 'none' }">{{ f }}</span>
           </div>
         </div>
 
-        <div v-if="loading" style="padding: 40px; text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg); opacity: 0.5; border: var(--border);">Загрузка...</div>
+        <div v-if="loading" style="padding: 40px; text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg); opacity: 0.5; border: 1px solid var(--border);">Загрузка...</div>
 
-        <div v-else style="border: var(--border); overflow-x: auto;">
+        <div v-else style="border: 1px solid var(--border); overflow-x: auto;">
           <table style="width: 100%; border-collapse: collapse;">
             <thead>
-              <tr style="background: var(--bg-alt); font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta);">
+              <tr style="background: var(--surface-2); font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg-subtle);">
                 <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Email</th>
                 <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Имя</th>
                 <th style="padding: 12px 16px; text-align: left; font-weight: 400;">План</th>
@@ -249,14 +240,14 @@ const statCards = [
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(u, i) in filteredUsers" :key="u.id" :style="{ background: i % 2 ? 'var(--bg-alt)' : 'var(--bg)', borderTop: 'var(--border)', opacity: u.is_banned ? 0.5 : 1 }">
+              <tr v-for="(u, i) in filteredUsers" :key="u.id" :style="{ background: i % 2 ? 'var(--surface-2)' : 'var(--bg)', borderTop: '1px solid var(--border)', opacity: u.is_banned ? 0.5 : 1 }">
                 <td style="padding: 12px 16px; font-size: 13px;">
                   {{ u.email }}
                   <span v-if="u.is_admin" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent); border: 1px solid var(--accent); padding: 1px 5px; margin-left: 6px; letter-spacing: 1.2px;">ADMIN</span>
-                  <span v-if="u.is_banned" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent2); border: 1px solid var(--accent2); padding: 1px 5px; margin-left: 4px;">BAN</span>
+                  <span v-if="u.is_banned" style="font-family: var(--font-mono); font-size: 9px; color: var(--danger); border: 1px solid var(--danger); padding: 1px 5px; margin-left: 4px;">BAN</span>
                 </td>
-                <td style="padding: 12px 16px; font-family: var(--font-display); font-size: 14px;">{{ u.username }}</td>
-                <td style="padding: 12px 16px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;" :style="{ color: u.is_premium ? 'var(--accent)' : 'var(--fg-dim)' }">{{ planLabel(u) }}</td>
+                <td style="padding: 12px 16px; font-family: var(--font-ui); font-size: 14px;">{{ u.username }}</td>
+                <td style="padding: 12px 16px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;" :style="{ color: u.is_premium ? 'var(--accent)' : 'var(--fg-muted)' }">{{ planLabel(u) }}</td>
                 <td style="padding: 12px 16px; font-family: var(--font-mono); font-size: 12px;">{{ u.total_messages }}</td>
                 <td style="padding: 12px 16px; font-family: var(--font-mono); font-size: 11px; opacity: 0.6;">{{ formatDate(u.last_active) }}</td>
                 <td style="padding: 12px 16px; text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
@@ -265,7 +256,7 @@ const statCards = [
                 </td>
               </tr>
               <tr v-if="filteredUsers.length === 0">
-                <td colspan="6" style="padding: 32px; text-align: center; font-family: var(--font-display); font-style: italic; color: var(--fg); opacity: 0.5;">Нет пользователей</td>
+                <td colspan="6" style="padding: 32px; text-align: center; font-family: var(--font-ui); font-style: italic; color: var(--fg); opacity: 0.5;">Нет пользователей</td>
               </tr>
             </tbody>
           </table>
@@ -279,26 +270,26 @@ const statCards = [
           ВЫДАЧА ПОДПИСОК
         </div>
 
-        <div style="border: var(--border); padding: 24px; max-width: 560px;">
+        <div style="border: 1px solid var(--border); padding: 24px; max-width: 560px;">
           <div style="margin-bottom: 16px;">
             <label class="field-label">Поиск по email</label>
             <input v-model="subSearch" class="m-input" style="width: 100%;" placeholder="user@example.com" />
             <div v-if="subSearch && foundUser" style="margin-top: 6px; font-size: 13px; color: var(--accent); font-family: var(--font-mono);">
               Найден: {{ foundUser.email }} ({{ planLabel(foundUser) }})
             </div>
-            <div v-if="subSearch && !foundUser" style="margin-top: 6px; font-size: 13px; color: var(--fg-dim); font-family: var(--font-mono);">Не найден</div>
+            <div v-if="subSearch && !foundUser" style="margin-top: 6px; font-size: 13px; color: var(--fg-muted); font-family: var(--font-mono);">Не найден</div>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
             <div>
               <label class="field-label">Тип подписки</label>
-              <div style="display: flex; gap: 0; border: var(--border); margin-top: 4px;">
+              <div style="display: flex; gap: 0; border: 1px solid var(--border); margin-top: 4px;">
                 <button v-for="t in [['premium', 'Premium'], ['premium_plus', 'Premium+']]" :key="t[0]" @click="subType = t[0] as any" class="filter-tab" :class="{ active: subType === t[0] }" style="flex: 1;">{{ t[1] }}</button>
               </div>
             </div>
             <div>
               <label class="field-label">Срок</label>
-              <div style="display: flex; gap: 0; border: var(--border); margin-top: 4px; flex-wrap: wrap;">
+              <div style="display: flex; gap: 0; border: 1px solid var(--border); margin-top: 4px; flex-wrap: wrap;">
                 <button v-for="m in [1, 3, 6, 12, null]" :key="String(m)" @click="subMonths = m" class="filter-tab" :class="{ active: subMonths === m }" style="flex: 1; min-width: 36px;">{{ m ? m + 'м' : '∞' }}</button>
               </div>
             </div>
@@ -315,8 +306,8 @@ const statCards = [
             <span style="opacity: 0.55;">·</span>
             АКТИВНЫЕ ПОДПИСКИ
           </div>
-          <div style="border: var(--border);">
-            <div v-for="(u, i) in users.filter(u => u.is_premium)" :key="u.id" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;" :style="{ borderTop: i > 0 ? 'var(--border)' : 'none' }">
+          <div style="border: 1px solid var(--border);">
+            <div v-for="(u, i) in users.filter(u => u.is_premium)" :key="u.id" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;" :style="{ borderTop: i > 0 ? '1px solid var(--border)' : 'none' }">
               <div>
                 <div style="font-size: 14px;">{{ u.email }}</div>
                 <div style="font-family: var(--font-mono); font-size: 10px; margin-top: 2px; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px;">
@@ -325,7 +316,7 @@ const statCards = [
               </div>
               <button class="act-btn danger" @click="revokeSubscription(u.id)">Отозвать</button>
             </div>
-            <div v-if="users.filter(u => u.is_premium).length === 0" style="padding: 24px; text-align: center; font-family: var(--font-display); font-style: italic; opacity: 0.5;">Нет активных подписок</div>
+            <div v-if="users.filter(u => u.is_premium).length === 0" style="padding: 24px; text-align: center; font-family: var(--font-ui); font-style: italic; opacity: 0.5;">Нет активных подписок</div>
           </div>
         </div>
       </div>
@@ -338,10 +329,10 @@ const statCards = [
         </div>
         <div v-if="limitsMsg" style="margin-bottom: 16px; padding: 8px 12px; border-left: 3px solid var(--accent); font-size: 13px; color: var(--accent); font-family: var(--font-mono);">{{ limitsMsg }}</div>
 
-        <div style="border: var(--border);">
+        <div style="border: 1px solid var(--border);">
           <table style="width: 100%; border-collapse: collapse;">
             <thead>
-              <tr style="background: var(--bg-alt); font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta);">
+              <tr style="background: var(--surface-2); font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg-subtle);">
                 <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Тариф</th>
                 <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Сообщ./день</th>
                 <th style="padding: 12px 16px; text-align: left; font-weight: 400;">История (сообщ.)</th>
@@ -351,8 +342,8 @@ const statCards = [
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(pt, idx) in ['free', 'premium', 'premium_plus']" :key="pt" :style="{ background: idx % 2 ? 'var(--bg-alt)' : 'var(--bg)', borderTop: 'var(--border)' }">
-                <td style="padding: 12px 16px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;" :style="{ color: pt === 'free' ? 'var(--fg-dim)' : 'var(--accent)' }">
+              <tr v-for="(pt, idx) in ['free', 'premium', 'premium_plus']" :key="pt" :style="{ background: idx % 2 ? 'var(--surface-2)' : 'var(--bg)', borderTop: '1px solid var(--border)' }">
+                <td style="padding: 12px 16px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;" :style="{ color: pt === 'free' ? 'var(--fg-muted)' : 'var(--accent)' }">
                   {{ planTypeLabels[pt] }}
                 </td>
                 <template v-if="planLimits[pt]">
@@ -399,10 +390,10 @@ const statCards = [
           </div>
           <button class="act-btn" @click="loadEvents">↺ Обновить</button>
         </div>
-        <div style="border: var(--border); overflow-x: auto;">
+        <div style="border: 1px solid var(--border); overflow-x: auto;">
           <table style="width: 100%; border-collapse: collapse;">
             <thead>
-              <tr style="background: var(--bg-alt); font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta);">
+              <tr style="background: var(--surface-2); font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg-subtle);">
                 <th style="padding: 12px 16px; text-align: left; font-weight: 400; white-space: nowrap;">Когда</th>
                 <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Источник</th>
                 <th style="padding: 12px 16px; text-align: left; font-weight: 400;">Действие</th>
@@ -411,7 +402,7 @@ const statCards = [
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(e, i) in events" :key="e.id" :style="{ background: i % 2 ? 'var(--bg-alt)' : 'var(--bg)', borderTop: 'var(--border)' }">
+              <tr v-for="(e, i) in events" :key="e.id" :style="{ background: i % 2 ? 'var(--surface-2)' : 'var(--bg)', borderTop: '1px solid var(--border)' }">
                 <td style="padding: 10px 16px; font-family: var(--font-mono); font-size: 11px; white-space: nowrap; opacity: 0.7;">{{ formatDate(e.created_at) }}</td>
                 <td style="padding: 10px 16px; font-size: 12px; font-family: var(--font-mono);">
                   <span v-if="!e.admin_email || e.admin_id === 0" style="opacity: 0.5; font-size: 10px; letter-spacing: 1px; text-transform: uppercase;">Система</span>
@@ -422,7 +413,7 @@ const statCards = [
                 <td style="padding: 10px 16px; font-family: var(--font-mono); font-size: 10px; opacity: 0.55; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ e.details ? JSON.stringify(e.details) : '—' }}</td>
               </tr>
               <tr v-if="events.length === 0">
-                <td colspan="5" style="padding: 32px; text-align: center; font-family: var(--font-display); font-style: italic; opacity: 0.5;">Нет событий</td>
+                <td colspan="5" style="padding: 32px; text-align: center; font-family: var(--font-ui); font-style: italic; opacity: 0.5;">Нет событий</td>
               </tr>
             </tbody>
           </table>
@@ -439,50 +430,50 @@ const statCards = [
           <button class="act-btn" @click="loadFinance">↺ Обновить</button>
         </div>
 
-        <div v-if="financeLoading" style="padding: 40px; text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg); opacity: 0.5; border: var(--border);">Загрузка...</div>
+        <div v-if="financeLoading" style="padding: 40px; text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg); opacity: 0.5; border: 1px solid var(--border);">Загрузка...</div>
 
         <div v-else-if="finance">
 
           <!-- OpenRouter block -->
-          <div style="border: var(--border); margin-bottom: 16px;">
-            <div style="padding: 14px 20px; background: var(--bg-alt); border-bottom: var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-              <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta);">OpenRouter API</div>
+          <div style="border: 1px solid var(--border); margin-bottom: 16px;">
+            <div style="padding: 14px 20px; background: var(--surface-2); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg-subtle);">OpenRouter API</div>
               <div style="font-family: var(--font-mono); font-size: 11px; opacity: 0.6;">{{ finance.model }}</div>
             </div>
 
-            <div v-if="finance.openrouter?.error" style="padding: 20px; color: var(--accent2); font-family: var(--font-mono); font-size: 12px;">
+            <div v-if="finance.openrouter?.error" style="padding: 20px; color: var(--danger); font-family: var(--font-mono); font-size: 12px;">
               ✖ {{ finance.openrouter.error }}
             </div>
             <div v-else style="padding: 0;">
               <!-- Big numbers -->
               <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;">
-                <div style="padding: 20px 24px; border-right: var(--border);">
-                  <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta); margin-bottom: 8px;">Потрачено</div>
-                  <div style="font-family: var(--font-display); font-weight: 200; font-size: 36px; color: var(--accent2); letter-spacing: -1px; line-height: 1;">
+                <div style="padding: 20px 24px; border-right: 1px solid var(--border);">
+                  <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg-subtle); margin-bottom: 8px;">Потрачено</div>
+                  <div style="font-family: var(--font-ui); font-weight: 200; font-size: 36px; color: var(--danger); letter-spacing: -1px; line-height: 1;">
                     ${{ (finance.openrouter?.usage ?? 0).toFixed(4) }}
                   </div>
                 </div>
-                <div style="padding: 20px 24px; border-right: var(--border);">
-                  <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta); margin-bottom: 8px;">Лимит</div>
-                  <div style="font-family: var(--font-display); font-weight: 200; font-size: 36px; color: var(--fg); letter-spacing: -1px; line-height: 1;">
+                <div style="padding: 20px 24px; border-right: 1px solid var(--border);">
+                  <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg-subtle); margin-bottom: 8px;">Лимит</div>
+                  <div style="font-family: var(--font-ui); font-weight: 200; font-size: 36px; color: var(--fg); letter-spacing: -1px; line-height: 1;">
                     {{ finance.openrouter?.limit != null ? '$' + Number(finance.openrouter.limit).toFixed(2) : '∞' }}
                   </div>
                 </div>
                 <div style="padding: 20px 24px;">
-                  <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta); margin-bottom: 8px;">Осталось</div>
-                  <div style="font-family: var(--font-display); font-weight: 200; font-size: 36px; letter-spacing: -1px; line-height: 1;" :style="{ color: finance.openrouter?.limit != null ? 'var(--accent)' : 'var(--meta)' }">
+                  <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg-subtle); margin-bottom: 8px;">Осталось</div>
+                  <div style="font-family: var(--font-ui); font-weight: 200; font-size: 36px; letter-spacing: -1px; line-height: 1;" :style="{ color: finance.openrouter?.limit != null ? 'var(--accent)' : 'var(--fg-subtle)' }">
                     {{ finance.openrouter?.limit != null ? '$' + (Number(finance.openrouter.limit) - (finance.openrouter?.usage ?? 0)).toFixed(4) : '—' }}
                   </div>
                 </div>
               </div>
 
               <!-- Progress bar -->
-              <div v-if="finance.openrouter?.limit != null" style="padding: 16px 24px; border-top: var(--border);">
-                <div style="height: 6px; background: var(--rule); position: relative;">
+              <div v-if="finance.openrouter?.limit != null" style="padding: 16px 24px; border-top: 1px solid var(--border);">
+                <div style="height: 6px; background: var(--surface-3); position: relative;">
                   <div :style="{
                     height: '100%',
                     width: Math.min((finance.openrouter?.usage ?? 0) / Number(finance.openrouter.limit) * 100, 100) + '%',
-                    background: 'var(--accent2)',
+                    background: 'var(--danger)',
                     transition: 'width 0.4s',
                   }"></div>
                 </div>
@@ -492,7 +483,7 @@ const statCards = [
               </div>
 
               <!-- Meta row -->
-              <div style="display: flex; gap: 24px; padding: 14px 24px; border-top: var(--border); background: var(--bg-alt); flex-wrap: wrap;">
+              <div style="display: flex; gap: 24px; padding: 14px 24px; border-top: 1px solid var(--border); background: var(--surface-2); flex-wrap: wrap;">
                 <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; opacity: 0.6;">
                   Free tier: <span :style="{ color: finance.openrouter?.is_free_tier ? 'var(--accent)' : 'var(--fg)' }">{{ finance.openrouter?.is_free_tier ? 'Да' : 'Нет' }}</span>
                 </div>
@@ -507,9 +498,9 @@ const statCards = [
           </div>
 
           <!-- Platform stats -->
-          <div style="border: var(--border);">
-            <div style="padding: 14px 20px; background: var(--bg-alt); border-bottom: var(--border);">
-              <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta);">Статистика платформы</div>
+          <div style="border: 1px solid var(--border);">
+            <div style="padding: 14px 20px; background: var(--surface-2); border-bottom: 1px solid var(--border);">
+              <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg-subtle);">Статистика платформы</div>
             </div>
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;">
               <div v-for="(item, i) in [
@@ -517,9 +508,9 @@ const statCards = [
                 { label: 'Premium', value: finance.platform.premium_users },
                 { label: 'Активных 24ч', value: finance.platform.active_users },
                 { label: 'Сообщений', value: finance.platform.total_messages.toLocaleString() },
-              ]" :key="item.label" style="padding: 20px 24px;" :style="{ borderLeft: i > 0 ? 'var(--border)' : 'none' }">
-                <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--meta); margin-bottom: 8px;">{{ item.label }}</div>
-                <div style="font-family: var(--font-display); font-weight: 200; font-size: 32px; color: var(--fg); letter-spacing: -1px; line-height: 1;">{{ item.value }}</div>
+              ]" :key="item.label" style="padding: 20px 24px;" :style="{ borderLeft: i > 0 ? '1px solid var(--border)' : 'none' }">
+                <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg-subtle); margin-bottom: 8px;">{{ item.label }}</div>
+                <div style="font-family: var(--font-ui); font-weight: 200; font-size: 32px; color: var(--fg); letter-spacing: -1px; line-height: 1;">{{ item.value }}</div>
               </div>
             </div>
           </div>
@@ -547,8 +538,8 @@ const statCards = [
   white-space: nowrap;
   transition: opacity 0.15s;
 }
-.admin-tab:hover { opacity: 0.9; }
-.admin-tab.active { opacity: 1; color: var(--accent); border-bottom-color: var(--accent); }
+.admin-tab:hover { opacity: 0.9; color: var(--fg); }
+.admin-tab.active { opacity: 1; color: var(--accent-soft); border-bottom-color: var(--accent-soft); }
 
 .filter-tab {
   padding: 6px 14px;
@@ -562,23 +553,24 @@ const statCards = [
   cursor: pointer;
   transition: background 0.15s;
 }
-.filter-tab.active { background: var(--accent); color: var(--bg); }
+.filter-tab.active { background: rgb(124 58 237 / 0.2); color: var(--accent-soft); }
 
 .act-btn {
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 1px;
-  color: var(--accent);
+  letter-spacing: 0.08em;
+  color: var(--accent-soft);
   background: transparent;
-  border: 1px solid var(--accent);
+  border: 1px solid rgb(124 58 237 / 0.3);
+  border-radius: var(--radius-sm);
   padding: 4px 10px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
   white-space: nowrap;
 }
-.act-btn:hover { background: var(--accent); color: var(--bg); }
-.act-btn.danger { color: var(--accent2); border-color: var(--accent2); }
-.act-btn.danger:hover { background: var(--accent2); color: var(--bg); }
+.act-btn:hover { background: rgb(124 58 237 / 0.15); }
+.act-btn.danger { color: var(--danger); border-color: rgb(239 68 68 / 0.4); }
+.act-btn.danger:hover { background: rgb(239 68 68 / 0.15); }
 
 .field-label {
   font-family: var(--font-mono);
@@ -597,7 +589,7 @@ const statCards = [
   font-family: var(--font-mono);
   font-size: 13px;
 }
-.editable-cell:hover { background: var(--bg-alt); }
+.editable-cell:hover { background: var(--surface-2); }
 
 @media (max-width: 900px) {
   header { padding: 20px 16px 0 !important; }

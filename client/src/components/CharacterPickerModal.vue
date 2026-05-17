@@ -66,12 +66,12 @@ function onEditorDeleted(id: number) {
 
         <!-- Modal header -->
         <div style="padding: 20px 24px 0; display: flex; align-items: center; justify-content: space-between;">
-          <div style="font-family: var(--font-display); font-size: 22px; font-weight: 600;">Персонажи</div>
+          <div style="font-family: var(--font-ui); font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: var(--fg);">Персонажи</div>
           <button @click="emit('close')" class="btn-ghost btn-sm" style="font-size: 18px; padding: 2px 8px;">✕</button>
         </div>
 
         <!-- Tabs -->
-        <div style="display: flex; gap: 0; padding: 16px 24px 0; border-bottom: var(--border);">
+        <div style="display: flex; gap: 0; padding: 16px 24px 0; border-bottom: 1px solid var(--border);">
           <button
             v-for="tab in [
               { id: 'canonical', label: 'Каноничные' },
@@ -118,10 +118,10 @@ function onEditorDeleted(id: number) {
                 <div style="flex: 1; min-width: 0;">
                   <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                     <span style="font-family: var(--font-display); font-weight: 600; font-size: 15px;">{{ c.name }}</span>
-                    <span v-if="c.is_premium" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent); letter-spacing: 1px;">✦ Premium</span>
-                    <span v-if="currentSlug === c.slug" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent2); letter-spacing: 1px;">● активен</span>
+                    <span v-if="c.is_premium" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-soft); letter-spacing: 1px;">✦ Premium</span>
+                    <span v-if="currentSlug === c.slug" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-soft); letter-spacing: 1px;">● активен</span>
                   </div>
-                  <div style="font-family: var(--font-display); font-size: 12px; opacity: 0.7; margin-top: 3px; line-height: 1.3;">
+                  <div style="font-size: 12px; color: var(--fg-muted); margin-top: 3px; line-height: 1.3;">
                     {{ c.description?.slice(0, 80) }}{{ (c.description?.length ?? 0) > 80 ? '...' : '' }}
                   </div>
                 </div>
@@ -135,7 +135,7 @@ function onEditorDeleted(id: number) {
               <div class="char-label">Ваши персонажи</div>
               <button class="btn-primary btn-sm" @click="openCreate">+ Создать</button>
             </div>
-            <div v-if="chat.myCharacters.length === 0" style="text-align: center; padding: 32px 0; font-family: var(--font-display); font-size: 14px; opacity: 0.5;">
+            <div v-if="chat.myCharacters.length === 0" style="text-align: center; padding: 32px 0; font-size: 14px; color: var(--fg-muted);">
               Создайте своего первого персонажа
             </div>
             <div v-else class="char-grid">
@@ -152,11 +152,11 @@ function onEditorDeleted(id: number) {
                 </div>
                 <div style="flex: 1; min-width: 0; cursor: pointer;" @click="selectUserChar(c.id)">
                   <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                    <span style="font-family: var(--font-display); font-weight: 600; font-size: 15px;">{{ c.name }}</span>
-                    <span v-if="c.is_public" style="font-family: var(--font-mono); font-size: 9px; color: var(--meta); letter-spacing: 1px;">◎ публичный</span>
-                    <span v-if="currentSlug === `uc:${c.id}`" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent2); letter-spacing: 1px;">● активен</span>
+                    <span style="font-weight: 600; font-size: 15px; color: var(--fg);">{{ c.name }}</span>
+                    <span v-if="c.is_public" style="font-family: var(--font-mono); font-size: 9px; color: var(--fg-subtle); letter-spacing: 1px;">◎ публичный</span>
+                    <span v-if="currentSlug === `uc:${c.id}`" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-soft); letter-spacing: 1px;">● активен</span>
                   </div>
-                  <div style="font-family: var(--font-display); font-size: 12px; opacity: 0.7; margin-top: 3px; line-height: 1.3;">
+                  <div style="font-size: 12px; color: var(--fg-muted); margin-top: 3px; line-height: 1.3;">
                     {{ c.description?.slice(0, 80) }}{{ (c.description?.length ?? 0) > 80 ? '...' : '' }}
                   </div>
                 </div>
@@ -173,7 +173,7 @@ function onEditorDeleted(id: number) {
           <!-- Community tab -->
           <div v-else-if="activeTab === 'community'">
             <div class="char-label" style="margin-bottom: 12px;">Персонажи, опубликованные пользователями</div>
-            <div v-if="chat.publicCharacters.length === 0" style="text-align: center; padding: 32px 0; font-family: var(--font-display); font-size: 14px; opacity: 0.5;">
+            <div v-if="chat.publicCharacters.length === 0" style="text-align: center; padding: 32px 0; font-size: 14px; color: var(--fg-muted);">
               Пока нет публичных персонажей
             </div>
             <div v-else class="char-grid">
@@ -190,13 +190,13 @@ function onEditorDeleted(id: number) {
                 </div>
                 <div style="flex: 1; min-width: 0;">
                   <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                    <span style="font-family: var(--font-display); font-weight: 600; font-size: 15px;">{{ c.name }}</span>
-                    <span v-if="currentSlug === `uc:${c.id}`" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent2); letter-spacing: 1px;">● активен</span>
+                    <span style="font-weight: 600; font-size: 15px; color: var(--fg);">{{ c.name }}</span>
+                    <span v-if="currentSlug === `uc:${c.id}`" style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-soft); letter-spacing: 1px;">● активен</span>
                   </div>
-                  <div style="font-family: var(--font-display); font-size: 12px; opacity: 0.7; margin-top: 3px; line-height: 1.3;">
+                  <div style="font-size: 12px; color: var(--fg-muted); margin-top: 3px; line-height: 1.3;">
                     {{ c.description?.slice(0, 80) }}{{ (c.description?.length ?? 0) > 80 ? '...' : '' }}
                   </div>
-                  <div v-if="c.author_name" style="font-family: var(--font-mono); font-size: 9px; opacity: 0.5; margin-top: 4px; letter-spacing: 1px;">
+                  <div v-if="c.author_name" style="font-family: var(--font-mono); font-size: 9px; color: var(--fg-subtle); margin-top: 4px; letter-spacing: 1px;">
                     by {{ c.author_name }}
                   </div>
                 </div>
@@ -220,12 +220,31 @@ function onEditorDeleted(id: number) {
 </template>
 
 <style scoped>
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 0 48px -8px rgb(124 58 237 / 0.4);
+}
+
 .char-label {
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 1.4px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  opacity: 0.6;
+  color: var(--fg-subtle);
 }
 
 .char-grid {
@@ -240,7 +259,8 @@ function onEditorDeleted(id: number) {
   gap: 14px;
   padding: 12px 14px;
   background: none;
-  border: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   color: var(--fg);
   cursor: pointer;
   text-align: left;
@@ -249,12 +269,12 @@ function onEditorDeleted(id: number) {
 }
 
 .char-card:hover {
-  background: var(--bg-alt);
+  background: var(--surface-2);
 }
 
 .char-card.active {
-  border-color: var(--accent);
-  background: var(--bg-alt);
+  border-color: rgb(124 58 237 / 0.5);
+  background: rgb(124 58 237 / 0.1);
 }
 
 .char-avatar {
@@ -263,8 +283,8 @@ function onEditorDeleted(id: number) {
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
-  background: var(--bg-alt);
-  border: var(--border);
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -277,9 +297,9 @@ function onEditorDeleted(id: number) {
 }
 
 .char-avatar-placeholder {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 18px;
-  font-weight: 600;
-  color: var(--accent);
+  font-weight: 700;
+  color: #fff;
 }
 </style>
