@@ -13,9 +13,20 @@ const router = useRouter()
 const auth   = useAuthStore()
 const chat   = useChatStore()
 
-// ── Mobile view switcher ───────────────────────────────────────────────────
-// 'sidebar' = show character list, 'chat' = show message panel
-const mobileView = ref<'sidebar' | 'chat'>('sidebar')
+// ── Layout state ───────────────────────────────────────────────────────────
+const mobileView  = ref<'sidebar' | 'chat'>('sidebar')
+const sidebarTab  = ref<'discover' | 'chats' | 'favorites'>('chats')
+
+// ── Discover state ─────────────────────────────────────────────────────────
+const discoverSearch   = ref('')
+const discoverCategory = ref('Все')
+const discoverCats = ['Все', '🔥 Популярные', '🎭 Ролевые', '🧙 Фэнтези', '🧠 Помощники', '💼 Работа', '🎮 Игры']
+
+const discoverChars = computed(() => {
+  const all = [...chat.characters, ...chat.publicCharacters]
+  const q = discoverSearch.value.trim().toLowerCase()
+  return q ? all.filter(c => c.name.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q)) : all
+})
 
 // ── Refs ──────────────────────────────────────────────────────────────────
 const messageInput        = ref('')
@@ -43,6 +54,15 @@ const currentCharObj = computed(() => {
 const charName    = computed(() => currentCharObj.value?.name    || 'Морган')
 const charInitial = computed(() => charName.value[0].toUpperCase())
 const charAvatar  = computed(() => (currentCharObj.value as any)?.avatar_url ?? null)
+const charDesc    = computed(() => (currentCharObj.value as any)?.description ?? 'AI-персонаж, готовый к диалогу.')
+
+// Character tags (decorative)
+const charTags = computed(() => {
+  const slug = currentCharacter.value
+  if (slug === 'morgan')    return ['#ролевой', '#умная', '#загадочная']
+  if (slug.startsWith('uc:')) return ['#пользовательский', '#уникальный']
+  return ['#AI', '#персонаж']
+})
 
 // ── Greetings / suggestions ────────────────────────────────────────────────
 const chatGreetings = [
@@ -55,10 +75,10 @@ const chatGreetings = [
 const randomGreeting = chatGreetings[Math.floor(Math.random() * chatGreetings.length)]
 
 const suggestions = [
-  'Расскажи что-нибудь о себе',
-  'Как ты сегодня?',
-  'Придумаем что-нибудь интересное?',
-  'Есть секрет, которым хочешь поделиться?',
+  { icon: '✨', text: 'Расскажи что-нибудь о себе' },
+  { icon: '💬', text: 'Как ты сегодня?' },
+  { icon: '🎲', text: 'Придумаем что-нибудь интересное?' },
+  { icon: '🔮', text: 'Есть секрет, которым хочешь поделиться?' },
 ]
 
 // ── Modes ──────────────────────────────────────────────────────────────────
@@ -76,17 +96,19 @@ const modeError      = ref('')
 
 // ── Init ───────────────────────────────────────────────────────────────────
 onMounted(async () => {
-  chat.isLoading   = false
-  chat.isStreaming  = false
-  await Promise.all([chat.fetchCharacters(), chat.fetchMyCharacters()])
+  chat.isLoading  = false
+  chat.isStreaming = false
+  await Promise.all([
+    chat.fetchCharacters(),
+    chat.fetchMyCharacters(),
+    chat.fetchPublicCharacters(),
+  ])
   await chat.fetchHistory(currentCharacter.value)
   nextTick(scrollToBottom)
 })
 
-watch(() => chat.messages.length,
-  () => nextTick(scrollToBottom))
-watch(() => chat.messages[chat.messages.length - 1]?.content,
-  () => nextTick(scrollToBottom))
+watch(() => chat.messages.length, () => nextTick(scrollToBottom))
+watch(() => chat.messages[chat.messages.length - 1]?.content, () => nextTick(scrollToBottom))
 
 // ── Scroll ─────────────────────────────────────────────────────────────────
 function scrollToBottom() {
@@ -158,12 +180,11 @@ async function switchCharacter(slug: string) {
   await auth.updateSettings({ selected_character: slug })
   await chat.fetchHistory(slug)
   showCharacterPicker.value = false
-  mobileView.value = 'chat'   // auto-navigate to chat panel on mobile
+  mobileView.value = 'chat'
 }
 
-// ── User character edit ────────────────────────────────────────────────────
+// ── User character ──────────────────────────────────────────────────────────
 function openCreateChar() { editingChar.value = null; showCreateChar.value = true }
-
 function onCharSaved(_char: UserCharacter) { showCreateChar.value = false; chat.fetchMyCharacters() }
 function onCharDeleted(id: number) {
   if (currentCharacter.value === `uc:${id}`) switchCharacter('morgan')
@@ -172,166 +193,295 @@ function onCharDeleted(id: number) {
 
 // ── Misc ───────────────────────────────────────────────────────────────────
 async function handleLogout() { await auth.logout(); router.push('/') }
-
 function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
 </script>
 
 <template>
   <div class="flex h-dvh overflow-hidden bg-[#090514] text-[var(--fg)]">
 
-    <!-- ══════════════════════════════════════════════════════════════
+    <!-- ══════════════════════════════════════════════════
          SIDEBAR
-         Mobile: visible only when mobileView === 'sidebar'
-         Desktop (md+): always visible
-    ══════════════════════════════════════════════════════════════ -->
-    <aside
-      :class="[
-        'flex-col w-80 shrink-0 bg-[#120d24] border-r border-violet-500/10',
-        mobileView === 'sidebar' ? 'flex' : 'hidden md:flex',
-      ]"
-    >
-      <!-- Brand -->
+    ══════════════════════════════════════════════════ -->
+    <aside :class="[
+      'flex-col w-80 shrink-0 border-r border-violet-500/10 bg-[#120d24]',
+      mobileView === 'sidebar' ? 'flex' : 'hidden md:flex',
+    ]">
+
+      <!-- Brand + Create CTA -->
       <div class="flex h-14 shrink-0 items-center justify-between border-b border-violet-500/10 px-4">
         <div class="flex items-center gap-2.5">
           <div class="flex size-8 items-center justify-center rounded-[8px]
                       bg-gradient-to-br from-violet-600 to-indigo-600
-                      text-white text-sm font-bold shadow-[0_4px_12px_-4px_rgb(124_58_237_/_0.5)]">
-            M
-          </div>
-          <span class="text-sm font-semibold text-[var(--fg)]">Morgan AI</span>
+                      text-white text-sm font-bold shadow-[0_4px_16px_-4px_rgb(124_58_237_/_0.6)]">M</div>
+          <span class="text-sm font-semibold tracking-tight text-[var(--fg)]">Morgan AI</span>
         </div>
-        <!-- Create character CTA -->
-        <Button variant="primary" size="sm" @click="openCreateChar">+ Создать</Button>
-      </div>
-
-      <!-- Section label -->
-      <div class="px-4 pb-1 pt-3 text-[9px] font-mono tracking-[0.14em] uppercase text-[var(--fg-subtle)] shrink-0">
-        Персонажи
-      </div>
-
-      <!-- Character list -->
-      <div class="flex-1 overflow-y-auto px-2 pb-2" style="scrollbar-width:thin">
-
-        <!-- Canonical characters -->
-        <button
-          v-for="c in chat.characters"
-          :key="c.slug"
-          @click="switchCharacter(c.slug)"
-          class="flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-left
-                 border transition-all duration-150 mb-1"
-          :class="currentCharacter === c.slug
-            ? 'bg-violet-500/15 border-violet-500/30 shadow-[inset_0_0_0_1px_rgb(124_58_237_/_0.25)]'
-            : 'border-transparent hover:bg-[var(--surface-2)] hover:border-violet-500/10'"
-        >
-          <div class="relative flex size-10 shrink-0 items-center justify-center rounded-[10px]
-                      bg-gradient-to-br from-violet-600 to-indigo-600 text-white font-bold text-sm overflow-hidden">
-            <img v-if="c.avatar_url" :src="c.avatar_url" :alt="c.name"
-                 class="size-full object-cover object-top" />
-            <span v-else>{{ getCharInitial(c.name) }}</span>
-            <span v-if="currentCharacter === c.slug"
-                  class="absolute bottom-0 right-0 size-2.5 rounded-full bg-emerald-400
-                         border-2 border-[#120d24]" />
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-1.5 text-sm font-medium leading-tight"
-                 :class="currentCharacter === c.slug ? 'text-violet-200' : 'text-[var(--fg)]'">
-              {{ c.name }}
-              <span v-if="c.is_premium" class="text-[9px] text-violet-400/70">✦</span>
-            </div>
-            <div class="mt-0.5 text-[11px] text-[var(--fg-subtle)] truncate">
-              {{ c.description?.slice(0, 32) }}{{ (c.description?.length ?? 0) > 32 ? '…' : '' }}
-            </div>
-          </div>
-        </button>
-
-        <!-- Active user character (if selected) -->
-        <div
-          v-if="currentCharacter.startsWith('uc:')"
-          class="flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5
-                 bg-violet-500/15 border border-violet-500/30 mb-1"
-        >
-          <div class="flex size-10 shrink-0 items-center justify-center rounded-[10px]
-                      bg-gradient-to-br from-fuchsia-600 to-violet-600 text-white font-bold text-sm">
-            {{ getCharInitial(currentCharObj?.name || 'М') }}
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="text-sm font-medium text-violet-200">{{ currentCharObj?.name || 'Мой персонаж' }}</div>
-            <div class="text-[11px] text-[var(--fg-subtle)]">Пользовательский · активен</div>
-          </div>
-        </div>
-
-        <!-- Browse all characters -->
-        <button
-          @click="showCharacterPicker = true"
-          class="mt-1 flex w-full items-center gap-2 rounded-[10px] border border-dashed
-                 border-violet-500/20 px-3 py-2 text-xs text-[var(--fg-subtle)]
-                 hover:border-violet-500/40 hover:text-violet-300 hover:bg-violet-500/5
-                 transition-all duration-150"
-        >
-          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        <Button variant="primary" size="sm" @click="openCreateChar">
+          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M12 5v14M5 12h14"/>
           </svg>
-          Все персонажи
-        </button>
+          Создать
+        </Button>
       </div>
 
-      <!-- User card -->
-      <div class="flex shrink-0 items-center gap-2.5 border-t border-violet-500/10 p-3">
-        <div class="flex size-9 shrink-0 items-center justify-center rounded-full
-                    bg-gradient-to-br from-indigo-600 to-fuchsia-600 text-white text-sm font-bold">
-          {{ (auth.user?.username || 'U')[0].toUpperCase() }}
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="truncate text-sm font-medium text-[var(--fg)]">{{ auth.user?.username || 'Пользователь' }}</div>
-          <div class="text-[10px] font-mono tracking-wider text-[var(--fg-subtle)]">
-            {{ auth.isPremium ? '✦ Premium' : 'Free' }}
+      <!-- Nav tabs: Discover / Chats / Favorites -->
+      <div class="flex shrink-0 gap-0.5 border-b border-violet-500/10 px-3 pt-2 pb-0">
+        <button
+          v-for="tab in [
+            { id: 'discover',   label: 'Discover',   icon: '🔍' },
+            { id: 'chats',      label: 'Chats',      icon: '💬' },
+            { id: 'favorites',  label: 'Favorites',  icon: '★' },
+          ]"
+          :key="tab.id"
+          @click="sidebarTab = (tab.id as 'discover' | 'chats' | 'favorites')"
+          class="flex-1 pb-2 pt-1.5 text-center text-[11px] font-mono tracking-wider uppercase
+                 border-b-2 transition-all duration-150"
+          :class="sidebarTab === tab.id
+            ? 'border-violet-500 text-violet-300'
+            : 'border-transparent text-[var(--fg-subtle)] hover:text-[var(--fg)]'"
+        >{{ tab.icon }} {{ tab.label }}</button>
+      </div>
+
+      <!-- ── DISCOVER tab ── -->
+      <template v-if="sidebarTab === 'discover'">
+        <!-- Search -->
+        <div class="px-3 pt-3 pb-2 shrink-0">
+          <div class="flex items-center gap-2 rounded-[10px] border border-violet-500/10
+                      bg-[var(--surface)] px-3 py-2 focus-within:border-violet-500/30
+                      transition-colors duration-150">
+            <svg class="size-3.5 shrink-0 text-[var(--fg-subtle)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              v-model="discoverSearch"
+              placeholder="Поиск персонажей..."
+              class="flex-1 bg-transparent text-xs text-[var(--fg)] placeholder:text-[var(--fg-subtle)] outline-none"
+            />
           </div>
         </div>
-        <div class="flex items-center gap-1">
-          <router-link to="/settings"
-            class="flex size-8 items-center justify-center rounded-[8px]
-                   text-[var(--fg-subtle)] hover:text-[var(--fg)] hover:bg-[var(--surface-2)]
-                   transition-colors duration-150"
-            title="Настройки"
-          >
-            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-            </svg>
-          </router-link>
+        <!-- Category tags -->
+        <div class="flex gap-1.5 overflow-x-auto px-3 pb-2 shrink-0" style="scrollbar-width:none">
           <button
-            @click="handleLogout"
-            class="flex size-8 items-center justify-center rounded-[8px]
-                   text-[var(--fg-subtle)] hover:text-red-400 hover:bg-red-500/10
-                   transition-colors duration-150"
-            title="Выйти"
+            v-for="cat in discoverCats" :key="cat"
+            @click="discoverCategory = cat"
+            class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-mono tracking-wider
+                   uppercase border transition-all duration-150 whitespace-nowrap"
+            :class="discoverCategory === cat
+              ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
+              : 'border-[var(--border)] text-[var(--fg-subtle)] hover:border-violet-500/20 hover:text-[var(--fg)]'"
+          >{{ cat }}</button>
+        </div>
+        <!-- Characters grid -->
+        <div class="flex-1 overflow-y-auto px-3 pb-3" style="scrollbar-width:thin">
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="c in discoverChars" :key="(c as any).slug || (c as any).id"
+              @click="switchCharacter((c as any).slug ? (c as any).slug : `uc:${(c as any).id}`)"
+              class="flex flex-col items-center gap-1.5 rounded-[12px] border p-2.5 text-center
+                     transition-all duration-150"
+              :class="currentCharacter === ((c as any).slug || `uc:${(c as any).id}`)
+                ? 'border-violet-500/40 bg-violet-500/10'
+                : 'border-[var(--border)] hover:border-violet-500/20 hover:bg-[var(--surface-2)]'"
+            >
+              <div class="relative flex size-12 items-center justify-center rounded-[10px]
+                          bg-gradient-to-br from-violet-600 to-indigo-600
+                          text-white font-bold text-lg overflow-hidden">
+                <img v-if="(c as any).avatar_url" :src="(c as any).avatar_url" :alt="c.name"
+                     class="size-full object-cover object-top" />
+                <span v-else>{{ getCharInitial(c.name) }}</span>
+              </div>
+              <div class="w-full">
+                <div class="text-[11px] font-semibold text-[var(--fg)] truncate">{{ c.name }}</div>
+                <div class="text-[9px] text-[var(--fg-subtle)] truncate">
+                  {{ c.description?.slice(0, 22) }}{{ (c.description?.length ?? 0) > 22 ? '…' : '' }}
+                </div>
+              </div>
+            </button>
+          </div>
+          <p v-if="discoverChars.length === 0"
+             class="pt-8 text-center text-xs text-[var(--fg-subtle)]">Ничего не найдено</p>
+        </div>
+      </template>
+
+      <!-- ── CHATS tab ── -->
+      <template v-else-if="sidebarTab === 'chats'">
+        <div class="flex-1 overflow-y-auto px-2 py-2" style="scrollbar-width:thin">
+          <!-- Active user character -->
+          <div
+            v-if="currentCharacter.startsWith('uc:')"
+            class="flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 mb-1
+                   bg-violet-500/15 border border-violet-500/30"
           >
-            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
+            <div class="flex size-10 shrink-0 items-center justify-center rounded-[10px]
+                        bg-gradient-to-br from-fuchsia-600 to-violet-600 text-white font-bold text-sm">
+              {{ getCharInitial(currentCharObj?.name || 'М') }}
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-medium text-violet-200 truncate">{{ currentCharObj?.name || 'Мой персонаж' }}</div>
+              <div class="text-[10px] text-violet-400">● активен</div>
+            </div>
+          </div>
+
+          <!-- Canonical characters -->
+          <button
+            v-for="c in chat.characters" :key="c.slug"
+            @click="switchCharacter(c.slug)"
+            class="flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-left
+                   border transition-all duration-150 mb-1"
+            :class="currentCharacter === c.slug
+              ? 'bg-violet-500/15 border-violet-500/30'
+              : 'border-transparent hover:bg-[var(--surface-2)] hover:border-violet-500/10'"
+          >
+            <div class="relative flex size-10 shrink-0 items-center justify-center rounded-[10px]
+                        bg-gradient-to-br from-violet-600 to-indigo-600 text-white font-bold text-sm overflow-hidden">
+              <img v-if="c.avatar_url" :src="c.avatar_url" :alt="c.name"
+                   class="size-full object-cover object-top" />
+              <span v-else>{{ getCharInitial(c.name) }}</span>
+              <span v-if="currentCharacter === c.slug"
+                    class="absolute bottom-0 right-0 size-2.5 rounded-full bg-emerald-400 border-2 border-[#120d24]" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5 text-sm font-medium leading-tight"
+                   :class="currentCharacter === c.slug ? 'text-violet-200' : 'text-[var(--fg)]'">
+                {{ c.name }}
+                <span v-if="c.is_premium" class="text-[9px] text-violet-400/70">✦</span>
+              </div>
+              <div class="mt-0.5 text-[10px] text-[var(--fg-subtle)] truncate">
+                {{ c.description?.slice(0, 30) }}{{ (c.description?.length ?? 0) > 30 ? '…' : '' }}
+              </div>
+            </div>
           </button>
+
+          <!-- Browse all -->
+          <button
+            @click="showCharacterPicker = true"
+            class="mt-1 flex w-full items-center gap-2 rounded-[10px] border border-dashed
+                   border-violet-500/20 px-3 py-2 text-xs text-[var(--fg-subtle)]
+                   hover:border-violet-500/40 hover:text-violet-300 hover:bg-violet-500/5
+                   transition-all duration-150"
+          >
+            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            Все персонажи
+          </button>
+        </div>
+      </template>
+
+      <!-- ── FAVORITES tab ── -->
+      <template v-else>
+        <div class="flex-1 overflow-y-auto px-2 py-2" style="scrollbar-width:thin">
+          <p v-if="chat.myCharacters.length === 0"
+             class="pt-12 text-center text-xs text-[var(--fg-subtle)] leading-relaxed px-4">
+            Здесь будут ваши персонажи.<br />
+            Нажмите «+ Создать» чтобы добавить первого.
+          </p>
+          <button
+            v-for="c in chat.myCharacters" :key="c.id"
+            @click="switchCharacter(`uc:${c.id}`)"
+            class="flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-left
+                   border transition-all duration-150 mb-1"
+            :class="currentCharacter === `uc:${c.id}`
+              ? 'bg-violet-500/15 border-violet-500/30'
+              : 'border-transparent hover:bg-[var(--surface-2)] hover:border-violet-500/10'"
+          >
+            <div class="flex size-10 shrink-0 items-center justify-center rounded-[10px]
+                        bg-gradient-to-br from-fuchsia-600 to-violet-600 text-white font-bold text-sm">
+              {{ getCharInitial(c.name) }}
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-medium text-[var(--fg)] truncate">{{ c.name }}</div>
+              <div class="mt-0.5 flex items-center gap-1.5 text-[10px] text-[var(--fg-subtle)]">
+                <span v-if="c.is_public" class="text-violet-400/70">◎ публичный</span>
+                <span v-else>приватный</span>
+              </div>
+            </div>
+          </button>
+          <button
+            @click="openCreateChar"
+            class="mt-1 flex w-full items-center gap-2 rounded-[10px] border border-dashed
+                   border-violet-500/20 px-3 py-2 text-xs text-[var(--fg-subtle)]
+                   hover:border-violet-500/40 hover:text-violet-300 hover:bg-violet-500/5
+                   transition-all duration-150"
+          >
+            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            Создать персонажа
+          </button>
+        </div>
+      </template>
+
+      <!-- ── User profile panel ── -->
+      <div class="shrink-0 border-t border-violet-500/10 p-3">
+        <div class="flex items-center gap-2.5 rounded-[12px] border border-violet-500/10
+                    bg-[var(--surface)] p-2.5">
+          <!-- Avatar -->
+          <div class="flex size-9 shrink-0 items-center justify-center rounded-full
+                      bg-gradient-to-br from-indigo-600 to-fuchsia-600 text-white text-sm font-bold">
+            {{ (auth.user?.username || 'U')[0].toUpperCase() }}
+          </div>
+          <!-- Info -->
+          <div class="min-w-0 flex-1">
+            <div class="truncate text-sm font-medium text-[var(--fg)]">{{ auth.user?.username || 'Пользователь' }}</div>
+            <div class="text-[10px] font-mono tracking-wider"
+                 :class="auth.isPremium ? 'text-violet-400' : 'text-[var(--fg-subtle)]'">
+              {{ auth.isPremium ? '✦ Premium' : 'Free plan' }}
+            </div>
+          </div>
+          <!-- Actions -->
+          <div class="flex items-center gap-1">
+            <router-link to="/settings"
+              class="flex size-7 items-center justify-center rounded-[6px]
+                     text-[var(--fg-subtle)] hover:text-[var(--fg)] hover:bg-[var(--surface-2)]
+                     transition-colors duration-150"
+              title="Настройки"
+            >
+              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+              </svg>
+            </router-link>
+            <router-link to="/pricing"
+              class="flex size-7 items-center justify-center rounded-[6px]
+                     text-[var(--fg-subtle)] hover:text-violet-400 hover:bg-violet-500/10
+                     transition-colors duration-150"
+              title="Подписка"
+            >
+              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            </router-link>
+            <button
+              @click="handleLogout"
+              class="flex size-7 items-center justify-center rounded-[6px]
+                     text-[var(--fg-subtle)] hover:text-red-400 hover:bg-red-500/10
+                     transition-colors duration-150"
+              title="Выйти"
+            >
+              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </aside>
 
-    <!-- ══════════════════════════════════════════════════════════════
+    <!-- ══════════════════════════════════════════════════
          CHAT PANEL
-         Mobile: visible only when mobileView === 'chat'
-         Desktop (md+): always visible
-    ══════════════════════════════════════════════════════════════ -->
-    <main
-      :class="[
-        'flex-col flex-1 min-w-0',
-        mobileView === 'chat' ? 'flex' : 'hidden md:flex',
-      ]"
-    >
+    ══════════════════════════════════════════════════ -->
+    <main :class="[
+      'flex-col flex-1 min-w-0',
+      mobileView === 'chat' ? 'flex' : 'hidden md:flex',
+    ]">
+
       <!-- ── Chat header ── -->
       <header class="flex h-14 shrink-0 items-center gap-3 border-b border-violet-500/10
                      bg-[#120d24]/50 backdrop-blur-md px-4">
 
-        <!-- Back button (mobile only) -->
+        <!-- Back (mobile) -->
         <button
           class="flex size-8 shrink-0 items-center justify-center rounded-[8px]
                  border border-[var(--border)] text-[var(--fg-muted)]
@@ -344,22 +494,28 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
           </svg>
         </button>
 
-        <!-- Character avatar -->
+        <!-- Avatar -->
         <div class="relative flex size-9 shrink-0 items-center justify-center rounded-[10px]
                     bg-gradient-to-br from-violet-600 to-indigo-600 text-white font-bold text-sm overflow-hidden">
-          <img v-if="charAvatar" :src="charAvatar" :alt="charName"
-               class="size-full object-cover object-top" />
+          <img v-if="charAvatar" :src="charAvatar" :alt="charName" class="size-full object-cover object-top" />
           <span v-else>{{ charInitial }}</span>
           <span class="absolute bottom-0 right-0 size-2.5 rounded-full bg-emerald-400 border-2 border-[#120d24]" />
         </div>
 
-        <!-- Character info -->
+        <!-- Name + status -->
         <div class="min-w-0 flex-1">
           <div class="text-sm font-semibold text-[var(--fg)] leading-tight">{{ charName }}</div>
           <div class="flex items-center gap-1.5 text-[11px] text-[var(--fg-subtle)]">
             <span class="text-emerald-400">●</span>
             онлайн · {{ currentMode.name }}
           </div>
+        </div>
+
+        <!-- AI model badge -->
+        <div class="hidden sm:flex items-center gap-1.5 rounded-full border border-violet-500/20
+                    bg-violet-500/5 px-2.5 py-1 shrink-0">
+          <div class="size-1.5 rounded-full bg-violet-400 animate-pulse" />
+          <span class="text-[10px] font-mono tracking-wider text-violet-400">DeepSeek v4</span>
         </div>
 
         <!-- Mode button -->
@@ -380,54 +536,68 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
         <div class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-mono tracking-wider uppercase"
              :class="auth.isPremium
                ? 'bg-violet-500/15 text-violet-300 border border-violet-500/30'
-               : 'bg-[var(--surface-2)] text-[var(--fg-subtle)] border border-[var(--border)]'"
-        >
+               : 'bg-[var(--surface-2)] text-[var(--fg-subtle)] border border-[var(--border)]'">
           {{ auth.isPremium ? '✦ Premium' : 'Free' }}
         </div>
       </header>
 
       <!-- ── Messages area ── -->
-      <div
-        ref="messagesContainer"
-        class="flex-1 overflow-y-auto px-4 py-6 space-y-5"
-        style="scrollbar-width:thin"
-      >
-        <!-- Empty state -->
+      <div ref="messagesContainer" class="flex-1 overflow-y-auto px-4 py-6 space-y-5"
+           style="scrollbar-width:thin">
+
+        <!-- ─ Empty / Welcome state ─ -->
         <div
           v-if="chat.messages.length === 0 && !chat.isLoading"
-          class="flex h-full flex-col items-center justify-center gap-5 text-center py-12"
+          class="flex h-full flex-col items-center justify-center gap-5 text-center py-8"
         >
-          <div class="relative flex size-24 items-center justify-center rounded-[24px]
+          <!-- Big avatar -->
+          <div class="relative flex size-28 items-center justify-center rounded-[28px]
                       bg-gradient-to-br from-violet-600 to-indigo-600
-                      text-4xl font-bold text-white overflow-hidden
-                      shadow-[0_20px_60px_-16px_rgb(124_58_237_/_0.6)]">
-            <img v-if="charAvatar" :src="charAvatar" :alt="charName"
-                 class="size-full object-cover object-top" />
+                      text-5xl font-bold text-white overflow-hidden
+                      shadow-[0_24px_64px_-16px_rgb(124_58_237_/_0.7)]
+                      ring-4 ring-violet-500/20">
+            <img v-if="charAvatar" :src="charAvatar" :alt="charName" class="size-full object-cover object-top" />
             <span v-else>{{ charInitial }}</span>
           </div>
-          <div>
+
+          <!-- Name + description -->
+          <div class="max-w-xs">
             <h2 class="text-2xl font-semibold tracking-tight text-[var(--fg)]">{{ charName }}</h2>
-            <p class="mt-1.5 text-sm text-[var(--fg-muted)] max-w-xs mx-auto leading-relaxed">
-              {{ (currentCharObj as any)?.description || 'AI-персонаж, готовый к диалогу.' }}
-            </p>
+            <p class="mt-2 text-sm text-[var(--fg-muted)] leading-relaxed">{{ charDesc }}</p>
           </div>
+
+          <!-- Tags -->
+          <div class="flex flex-wrap justify-center gap-1.5">
+            <span
+              v-for="tag in charTags" :key="tag"
+              class="rounded-full border border-violet-500/20 bg-violet-500/5
+                     px-2.5 py-0.5 text-[11px] font-mono text-violet-400/80"
+            >{{ tag }}</span>
+          </div>
+
+          <!-- Greeting -->
           <p class="text-sm text-violet-300/70 italic max-w-xs">{{ randomGreeting }}</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-sm">
+
+          <!-- Suggested prompts -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-md mt-1">
             <button
-              v-for="s in suggestions" :key="s"
-              @click="sendSuggestion(s)"
-              class="rounded-[10px] border border-violet-500/10 bg-[var(--surface)]
-                     px-3 py-2.5 text-sm text-[var(--fg-muted)] text-left
-                     hover:border-violet-500/30 hover:bg-violet-500/5 hover:text-[var(--fg)]
-                     transition-all duration-150"
-            >{{ s }}</button>
+              v-for="s in suggestions" :key="s.text"
+              @click="sendSuggestion(s.text)"
+              class="flex items-center gap-2.5 rounded-[12px] border border-violet-500/10
+                     bg-[#120d24] px-4 py-3 text-sm text-[var(--fg-muted)] text-left
+                     hover:border-violet-500/40 hover:bg-violet-500/5 hover:text-[var(--fg)]
+                     transition-all duration-200 active:scale-[0.98]"
+            >
+              <span class="text-base">{{ s.icon }}</span>
+              <span>{{ s.text }}</span>
+            </button>
           </div>
         </div>
 
-        <!-- Message list -->
+        <!-- ─ Message list ─ -->
         <template v-for="msg in chat.messages" :key="msg.timestamp">
 
-          <!-- User bubble (right) -->
+          <!-- User (right) -->
           <div v-if="msg.role === 'user'" class="flex justify-end">
             <div class="max-w-[80%] sm:max-w-[65%] rounded-[20px] rounded-tr-[4px]
                         bg-gradient-to-br from-violet-600 to-indigo-600 text-white
@@ -437,27 +607,21 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
             </div>
           </div>
 
-          <!-- AI bubble (left) -->
+          <!-- AI (left) -->
           <div v-else class="flex items-end gap-2.5">
             <div class="flex size-8 shrink-0 items-center justify-center rounded-[8px]
                         bg-gradient-to-br from-violet-600 to-indigo-600 text-white text-sm font-bold
                         overflow-hidden self-end">
-              <img v-if="charAvatar" :src="charAvatar" :alt="charName"
-                   class="size-full object-cover object-top" />
+              <img v-if="charAvatar" :src="charAvatar" :alt="charName" class="size-full object-cover object-top" />
               <span v-else>{{ charInitial }}</span>
             </div>
             <div class="max-w-[80%] sm:max-w-[65%]">
               <div class="mb-1 text-[11px] font-mono text-[var(--fg-subtle)]">{{ charName }}</div>
-              <div class="rounded-[20px] rounded-tl-[4px] border border-violet-500/10
-                          bg-[#120d24] px-4 py-3">
+              <div class="rounded-[20px] rounded-tl-[4px] border border-violet-500/10 bg-[#120d24] px-4 py-3">
                 <div v-html="formatContent(msg.content)" class="text-sm leading-relaxed text-[var(--fg)]" />
                 <span v-if="msg.isStreaming" class="streaming-cursor" />
-                <audio
-                  v-if="msg.voiceUrl || msg.has_voice"
-                  :src="msg.voiceUrl"
-                  controls
-                  class="mt-2 w-full h-8 rounded-[8px]"
-                />
+                <audio v-if="msg.voiceUrl || msg.has_voice" :src="msg.voiceUrl" controls
+                       class="mt-2 w-full h-8 rounded-[8px]" />
                 <div class="mt-1.5 text-[10px] text-[var(--fg-subtle)]">{{ formatTime(msg.timestamp) }}</div>
               </div>
             </div>
@@ -509,31 +673,24 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
 
           <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="handleFileUpload" />
 
-          <!-- Image upload -->
-          <button
-            @click="triggerFileUpload"
+          <button @click="triggerFileUpload"
             class="flex size-8 shrink-0 items-center justify-center rounded-[8px]
                    text-[var(--fg-subtle)] hover:text-violet-400 hover:bg-violet-500/10
                    transition-colors duration-150 self-end mb-0.5"
-            title="Загрузить фото"
-          >
+            title="Загрузить фото">
             <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
             </svg>
           </button>
 
-          <!-- Mic -->
-          <button
-            @click="isRecording = !isRecording"
+          <button @click="isRecording = !isRecording"
             class="flex size-8 shrink-0 items-center justify-center rounded-[8px]
                    transition-colors duration-150 self-end mb-0.5"
             :class="isRecording
               ? 'text-red-400 bg-red-500/15'
               : 'text-[var(--fg-subtle)] hover:text-violet-400 hover:bg-violet-500/10'"
-            title="Голосовое"
-          >
+            title="Голосовое">
             <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
               <path d="M19 10v2a7 7 0 01-14 0v-2"/>
@@ -541,7 +698,6 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
             </svg>
           </button>
 
-          <!-- Textarea -->
           <textarea
             v-model="messageInput"
             @keydown="handleKeydown"
@@ -554,23 +710,19 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
             style="scrollbar-width:none"
           />
 
-          <!-- Send -->
-          <button
-            @click="sendMessage"
+          <button @click="sendMessage"
             :disabled="!messageInput.trim() || chat.isLoading"
             class="flex size-8 shrink-0 items-center justify-center rounded-[8px]
                    transition-all duration-150 self-end mb-0.5"
             :class="messageInput.trim() && !chat.isLoading
               ? 'bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-[0_4px_16px_-4px_rgb(124_58_237_/_0.5)] hover:-translate-y-px active:scale-95'
-              : 'bg-[var(--surface-2)] text-[var(--fg-subtle)] cursor-not-allowed'"
-          >
+              : 'bg-[var(--surface-2)] text-[var(--fg-subtle)] cursor-not-allowed'">
             <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
               <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
             </svg>
           </button>
         </div>
 
-        <!-- Footer -->
         <div class="mt-1.5 flex items-center justify-between px-1 text-[10px] text-[var(--fg-subtle)] font-mono">
           <span v-if="auth.user">
             {{ auth.user.daily_messages_count || 0 }} / {{ auth.isPremium ? '∞' : '50' }} сегодня
@@ -580,60 +732,45 @@ function getCharInitial(name: string) { return (name || 'M')[0].toUpperCase() }
       </div>
     </main>
 
-    <!-- ═══════════════════════════════════════════════════════════
+    <!-- ═══════════════════════════════════
          MODALS
-    ═══════════════════════════════════════════════════════════ -->
+    ═══════════════════════════════════ -->
 
-    <!-- Modes modal -->
-    <Modal
-      :open="showModes"
-      title="Режим поведения"
-      size="sm"
-      @update:open="val => !val && (showModes = false)"
-      @close="showModes = false"
-    >
+    <Modal :open="showModes" title="Режим поведения" size="sm"
+           @update:open="val => !val && (showModes = false)" @close="showModes = false">
       <div class="flex flex-col gap-2.5">
         <div v-if="modeError"
              class="rounded-[8px] bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400">
           {{ modeError }}
         </div>
-        <div
-          v-for="m in modes" :key="m.id"
-          @click="m.restricted && !auth.canNsfw ? undefined : setMode(m.id)"
-          class="flex flex-col gap-1 rounded-[10px] border p-3 transition-all duration-150"
-          :class="[
-            auth.user?.behavior_mode === m.id
-              ? 'bg-violet-500/15 border-violet-500/40'
-              : 'border-[var(--border)] hover:border-violet-500/20 hover:bg-[var(--surface-2)]',
-            m.restricted && !auth.canNsfw ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
-          ]"
-        >
+        <div v-for="m in modes" :key="m.id"
+             @click="m.restricted && !auth.canNsfw ? undefined : setMode(m.id)"
+             class="flex flex-col gap-1 rounded-[10px] border p-3 transition-all duration-150"
+             :class="[
+               auth.user?.behavior_mode === m.id
+                 ? 'bg-violet-500/15 border-violet-500/40'
+                 : 'border-[var(--border)] hover:border-violet-500/20 hover:bg-[var(--surface-2)]',
+               m.restricted && !auth.canNsfw ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+             ]">
           <div class="flex items-center justify-between">
             <span class="text-sm font-medium text-[var(--fg)]">{{ m.name }}</span>
             <span v-if="auth.user?.behavior_mode === m.id" class="text-[10px] text-violet-400">● активен</span>
             <span v-else-if="m.restricted && !auth.canNsfw" class="text-[10px] text-[var(--fg-subtle)]">✦ Premium</span>
           </div>
           <p class="text-xs text-[var(--fg-muted)]">{{ m.desc }}</p>
-          <p v-if="m.restricted && nsfwGeoBlocked" class="text-xs text-red-400">✖ Недоступно в вашем регионе</p>
+          <p v-if="m.restricted && nsfwGeoBlocked" class="text-xs text-red-400">✖ Недоступно в регионе</p>
         </div>
       </div>
     </Modal>
 
-    <!-- Character picker -->
     <CharacterPickerModal
-      :visible="showCharacterPicker"
-      :current-slug="currentCharacter"
-      @close="showCharacterPicker = false"
-      @select="switchCharacter"
+      :visible="showCharacterPicker" :current-slug="currentCharacter"
+      @close="showCharacterPicker = false" @select="switchCharacter"
     />
 
-    <!-- Create / edit character -->
     <CharacterEditorModal
-      :visible="showCreateChar"
-      :character="editingChar"
-      @close="showCreateChar = false"
-      @saved="onCharSaved"
-      @deleted="onCharDeleted"
+      :visible="showCreateChar" :character="editingChar"
+      @close="showCreateChar = false" @saved="onCharSaved" @deleted="onCharDeleted"
     />
 
   </div>
