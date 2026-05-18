@@ -28,7 +28,7 @@ export class ChatService {
   }
 
   async processVoice(user: User, audioBuffer: Buffer): Promise<string> {
-    const transcribed = await transcribeAudio(audioBuffer, 'voice.ogg');
+    const transcribed = await transcribeAudio(audioBuffer, 'ogg');
     this.logger.info({ userId: user.id }, 'Voice transcribed');
     return this.process(user, transcribed, 'voice');
   }
