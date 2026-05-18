@@ -1,0 +1,13 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.log
+.git
+.github
+PlayWrightPNG
+Docs
+README.md
+CLAUDE.md
+docker-compose.yml
