@@ -40,8 +40,9 @@ export async function openrouterFetch(
 }
 
 export function isRetryableError(err: OpenRouterError): boolean {
-  if (err.status === 429 || err.status === 503 || err.status >= 500) return true;
-  // 404 "No endpoints found" = модель недоступна → fallback
-  if (err.status === 404 && err.message.includes('No endpoints found')) return true;
-  return false;
+  // Только auth/payment ошибки явно не лечатся сменой модели
+  if (err.status === 401 || err.status === 402) return false;
+  // 403, 404, 429, 5xx и всё остальное:
+  // может означать "нет доступа к этой модели" или "модель недоступна" → fallback
+  return true;
 }

@@ -45,9 +45,16 @@ export async function chatCompletion(
       };
     } catch (err) {
       if (err instanceof OpenRouterError && isRetryableError(err)) {
-        logger.warn({ model, status: err.status }, 'Model unavailable, trying fallback');
+        logger.warn(
+          { model, status: err.status, message: err.message.slice(0, 200) },
+          'Model failed, trying next',
+        );
         continue;
       }
+      logger.error(
+        { model, status: err instanceof OpenRouterError ? err.status : 'unknown', err },
+        'Non-retryable error, aborting',
+      );
       throw err;
     }
   }

@@ -39,7 +39,7 @@ export async function startBot(logger: pino.Logger): Promise<void> {
   bot.action(/^char:\d+$/, characterCallbackHandler(characterService, userService));
   bot.on('text', messageHandler(chatService));
   bot.on('photo', photoHandler(chatService));
-  bot.on('voice', voiceHandler(chatService));
+  bot.on('voice', voiceHandler(chatService, logger));
 
   bot.catch(createErrorHandler(logger));
 
