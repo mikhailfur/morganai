@@ -39,6 +39,9 @@ export async function openrouterFetch(
   return response.json();
 }
 
-export function isRetryableStatus(status: number): boolean {
-  return status === 429 || status === 503 || (status >= 500 && status < 600);
+export function isRetryableError(err: OpenRouterError): boolean {
+  if (err.status === 429 || err.status === 503 || err.status >= 500) return true;
+  // 404 "No endpoints found" = модель недоступна → fallback
+  if (err.status === 404 && err.message.includes('No endpoints found')) return true;
+  return false;
 }

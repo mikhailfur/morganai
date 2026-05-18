@@ -1,5 +1,5 @@
 import pino from 'pino';
-import { openrouterFetch, OpenRouterError, isRetryableStatus } from './client.js';
+import { openrouterFetch, OpenRouterError, isRetryableError } from './client.js';
 import { getModelsForTier } from './models.js';
 import type {
   ChatCompletionParams,
@@ -44,7 +44,7 @@ export async function chatCompletion(
         tokensCacheRead: usage.prompt_tokens_details?.cached_tokens ?? 0,
       };
     } catch (err) {
-      if (err instanceof OpenRouterError && isRetryableStatus(err.status)) {
+      if (err instanceof OpenRouterError && isRetryableError(err)) {
         logger.warn({ model, status: err.status }, 'Model unavailable, trying fallback');
         continue;
       }

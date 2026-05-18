@@ -6,7 +6,7 @@ export async function transcribeAudio(
   filename: string = 'voice.ogg',
 ): Promise<string> {
   const formData = new FormData();
-  formData.append('file', new Blob([audioBuffer]), filename);
+  formData.append('file', new Blob([audioBuffer], { type: 'audio/ogg' }), filename);
   formData.append('model', MODELS.WHISPER);
 
   const response = await fetch('https://openrouter.ai/api/v1/audio/transcriptions', {
