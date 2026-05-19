@@ -2,6 +2,15 @@ import type { User, CharacterMode } from '../database/schema.js';
 
 const BLOCKED_REGIONS = ['KOR'];
 
+export const NSFW_SENTINEL = '__NSFW_BLOCKED__';
+
+export class NsfwBlockedError extends Error {
+  constructor(public readonly reason: 'region' | 'no_access') {
+    super('NSFW content blocked');
+    this.name = 'NsfwBlockedError';
+  }
+}
+
 export class NsfwService {
   hasNsfwAccess(user: User): boolean {
     if (user.blocked) return false;
@@ -31,8 +40,16 @@ export class NsfwService {
     return true;
   }
 
+  isSentinel(response: string): boolean {
+    return response.trim() === NSFW_SENTINEL;
+  }
+
   getSafetySystemPromptAddon(user: User): string | null {
     if (this.hasNsfwAccess(user)) return null;
-    return '\n\n[SAFETY] You must refuse any sexually explicit, pornographic, or 18+ content requests. Keep all interactions appropriate for all ages.';
+    return (
+      `\n\n[CONTENT POLICY] If the user's message contains sexually explicit, pornographic, romantic/sexual roleplay, or any 18+ content, ` +
+      `you MUST respond with ONLY the exact text: ${NSFW_SENTINEL}\n` +
+      `Do not add any explanation, apology, or other text — just that exact string and nothing else.`
+    );
   }
 }

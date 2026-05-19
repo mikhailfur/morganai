@@ -8,6 +8,7 @@ import type { CharacterRepository } from '../database/repositories/character.rep
 import type { CharacterService } from './character.service.js';
 import type { SessionService } from './session.service.js';
 import type { NsfwService } from './nsfw.service.js';
+import { NsfwBlockedError } from './nsfw.service.js';
 import type { User } from '../database/schema.js';
 import type { OpenRouterMessage } from '../providers/openrouter/types.js';
 
@@ -78,6 +79,13 @@ export class ChatService {
       messages,
       tier: user.tier as 'free' | 'premium',
     });
+
+    // Sentinel response means the model detected NSFW content
+    if (this.nsfwService.isSentinel(result.content)) {
+      const reason = this.nsfwService.getNsfwBlockReason(user) ?? 'no_access';
+      this.logger.info({ userId: user.id, sessionId: session.id }, 'NSFW sentinel detected');
+      throw new NsfwBlockedError(reason);
+    }
 
     this.contextManager.addUserMessage(session.id, userText);
     this.contextManager.addAssistantMessage(session.id, result.content);
