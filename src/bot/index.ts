@@ -30,7 +30,15 @@ import { kycCallbackHandler } from './handlers/kyc.js';
 import { menuCallbackHandler } from './handlers/menu.js';
 import type { BotContext } from './context.js';
 
-export async function startBot(logger: pino.Logger): Promise<void> {
+export interface BotStartResult {
+  bot: Telegraf<BotContext>;
+  deps: {
+    kycService: KycService;
+    nsfwService: NsfwService;
+  };
+}
+
+export async function startBot(logger: pino.Logger): Promise<BotStartResult> {
   const userRepo = new UserRepository(db);
   const charRepo = new CharacterRepository(db);
   const messageRepo = new MessageRepository(db);
@@ -107,4 +115,6 @@ export async function startBot(logger: pino.Logger): Promise<void> {
 
   process.once('SIGINT', () => bot.stop('SIGINT'));
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+  return { bot, deps: { kycService, nsfwService } };
 }

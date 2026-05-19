@@ -24,6 +24,9 @@ const envSchema = z.object({
   DIDIT_WORKFLOW_ID: z.string().default(''),
   DIDIT_WEBHOOK_SECRET: z.string().default(''),
 
+  PORT: z.coerce.number().int().positive().default(3000),
+  SERVER_URL: z.string().default(''),
+
   CONTEXT_WINDOW_SIZE: z.coerce.number().int().positive().default(20),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('production'),
