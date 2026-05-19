@@ -3,7 +3,11 @@ import { chatCompletion } from '../providers/openrouter/chat.js';
 import { transcribeAudio } from '../providers/openrouter/transcription.js';
 import type { ContextManager } from '../memory/context-manager.js';
 import type { MessageRepository } from '../database/repositories/message.repository.js';
+import type { SessionRepository } from '../database/repositories/session.repository.js';
+import type { CharacterRepository } from '../database/repositories/character.repository.js';
 import type { CharacterService } from './character.service.js';
+import type { SessionService } from './session.service.js';
+import type { NsfwService } from './nsfw.service.js';
 import type { User } from '../database/schema.js';
 import type { OpenRouterMessage } from '../providers/openrouter/types.js';
 
@@ -11,7 +15,11 @@ export class ChatService {
   constructor(
     private contextManager: ContextManager,
     private messageRepo: MessageRepository,
+    private sessionRepo: SessionRepository,
+    private charRepo: CharacterRepository,
     private characterService: CharacterService,
+    private sessionService: SessionService,
+    private nsfwService: NsfwService,
     private logger: pino.Logger,
   ) {}
 
@@ -39,28 +47,50 @@ export class ChatService {
     mediaType: 'text' | 'image' | 'voice',
   ): Promise<string> {
     const character = await this.characterService.getForUser(user.activeCharId);
-    const chatId = await this.messageRepo.findOrCreateChat(user.id, character.id);
+    const session = await this.sessionService.getOrCreate(user.id, character.id);
 
     const userText = typeof content === 'string' ? content : '[media]';
-    const messages = await this.contextManager.buildContextMessages(chatId, content, character);
+
+    // Fire-and-forget: name session on first message
+    if (!session.name && typeof content === 'string') {
+      this.sessionService.nameSessionAsync(session.id, content).catch(() => {});
+    }
+
+    // Build system prompt with mode addon and NSFW safety modifier
+    let systemPrompt = character.systemPrompt;
+
+    if (session.activeModeId) {
+      const mode = await this.charRepo.findModeById(session.activeModeId);
+      if (mode?.promptAddon) {
+        systemPrompt += `\n\n${mode.promptAddon}`;
+      }
+    }
+
+    const safetyAddon = this.nsfwService.getSafetySystemPromptAddon(user);
+    if (safetyAddon) {
+      systemPrompt += safetyAddon;
+    }
+
+    const charWithPrompt = { ...character, systemPrompt };
+    const messages = await this.contextManager.buildContextMessages(session.id, content, charWithPrompt);
 
     const result = await chatCompletion({
       messages,
       tier: user.tier as 'free' | 'premium',
     });
 
-    this.contextManager.addUserMessage(chatId, userText);
-    this.contextManager.addAssistantMessage(chatId, result.content);
+    this.contextManager.addUserMessage(session.id, userText);
+    this.contextManager.addAssistantMessage(session.id, result.content);
 
     this.messageRepo.save({
-      chatId,
+      chatId: session.id,
       role: 'user',
       content: userText,
       mediaType: mediaType !== 'text' ? mediaType : undefined,
     }).catch((err) => this.logger.error({ err }, 'Failed to save user message'));
 
     this.messageRepo.save({
-      chatId,
+      chatId: session.id,
       role: 'assistant',
       content: result.content,
       modelUsed: result.modelUsed,
@@ -69,9 +99,12 @@ export class ChatService {
       tokensCacheRead: result.tokensCacheRead,
     }).catch((err) => this.logger.error({ err }, 'Failed to save assistant message'));
 
+    this.sessionRepo.touchUpdatedAt(session.id).catch(() => {});
+
     this.logger.info(
       {
         userId: user.id,
+        sessionId: session.id,
         model: result.modelUsed,
         cacheRead: result.tokensCacheRead,
       },

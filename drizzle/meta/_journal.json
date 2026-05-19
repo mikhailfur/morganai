@@ -15,6 +15,13 @@
       "when": 1779129491000,
       "tag": "0001_seed_morgan_character",
       "breakpoints": false
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779209004046,
+      "tag": "0002_yellow_viper",
+      "breakpoints": true
     }
   ]
 }

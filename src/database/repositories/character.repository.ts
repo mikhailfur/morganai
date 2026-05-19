@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { Db } from '../connection.js';
-import { characters, type Character } from '../schema.js';
+import { characters, characterModes, type Character, type CharacterMode } from '../schema.js';
 
 export class CharacterRepository {
   constructor(private db: Db) {}
@@ -25,5 +25,32 @@ export class CharacterRepository {
 
   async findAll(): Promise<Character[]> {
     return this.db.select().from(characters).where(eq(characters.isActive, true));
+  }
+
+  async findModesByChar(charId: number): Promise<CharacterMode[]> {
+    return this.db
+      .select()
+      .from(characterModes)
+      .where(eq(characterModes.charId, charId))
+      .orderBy(characterModes.sortOrder);
+  }
+
+  async findModeById(modeId: number): Promise<CharacterMode | undefined> {
+    const result = await this.db
+      .select()
+      .from(characterModes)
+      .where(eq(characterModes.id, modeId))
+      .limit(1);
+    return result[0];
+  }
+
+  async findDefaultMode(charId: number): Promise<CharacterMode | undefined> {
+    const result = await this.db
+      .select()
+      .from(characterModes)
+      .where(eq(characterModes.charId, charId))
+      .orderBy(characterModes.isDefault)
+      .limit(1);
+    return result[0];
   }
 }
