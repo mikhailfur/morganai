@@ -8,6 +8,7 @@ import {
   integer,
   timestamp,
   index,
+  unique,
 } from 'drizzle-orm/pg-core';
 
 export const characters = pgTable('characters', {
@@ -22,18 +23,22 @@ export const characters = pgTable('characters', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const characterModes = pgTable('character_modes', {
-  id: serial('id').primaryKey(),
-  charId: integer('char_id')
-    .notNull()
-    .references(() => characters.id, { onDelete: 'cascade' }),
-  slug: varchar('slug', { length: 100 }).notNull(),
-  name: varchar('name', { length: 255 }).notNull(),
-  promptAddon: text('prompt_addon'),
-  isNsfw: boolean('is_nsfw').default(false).notNull(),
-  isDefault: boolean('is_default').default(false).notNull(),
-  sortOrder: integer('sort_order').default(0).notNull(),
-});
+export const characterModes = pgTable(
+  'character_modes',
+  {
+    id: serial('id').primaryKey(),
+    charId: integer('char_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    slug: varchar('slug', { length: 100 }).notNull(),
+    name: varchar('name', { length: 255 }).notNull(),
+    promptAddon: text('prompt_addon'),
+    isNsfw: boolean('is_nsfw').default(false).notNull(),
+    isDefault: boolean('is_default').default(false).notNull(),
+    sortOrder: integer('sort_order').default(0).notNull(),
+  },
+  (t) => [unique('uq_char_mode_slug').on(t.charId, t.slug)],
+);
 
 export const users = pgTable('users', {
   id: bigint('id', { mode: 'number' }).primaryKey(),

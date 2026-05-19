@@ -1,0 +1,1 @@
+ALTER TABLE "character_modes" ADD CONSTRAINT "uq_char_mode_slug" UNIQUE("char_id","slug");

@@ -1,6 +1,8 @@
 import pino from 'pino';
 import { env } from './config/index.js';
 import { migrateDb } from './database/migrate.js';
+import { db } from './database/connection.js';
+import { seedCharacters } from './database/seeder.js';
 import { startBot } from './bot/index.js';
 
 const logger = pino({
@@ -12,7 +14,7 @@ async function main() {
   logger.info('Starting Morgan AI...');
 
   await migrateDb(logger);
-  logger.info('Database migrations applied');
+  await seedCharacters(db, logger);
 
   await startBot(logger);
 }
