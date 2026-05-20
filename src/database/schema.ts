@@ -85,7 +85,7 @@ export const messages = pgTable(
     id: serial('id').primaryKey(),
     chatId: integer('chat_id')
       .notNull()
-      .references(() => chats.id),
+      .references(() => chats.id, { onDelete: 'cascade' }),
     role: varchar('role', { length: 20 }).notNull(),
     content: text('content').notNull(),
     mediaType: varchar('media_type', { length: 20 }),

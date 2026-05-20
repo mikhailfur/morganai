@@ -29,6 +29,13 @@
       "when": 1779211301653,
       "tag": "0003_new_cargill",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1748736000000,
+      "tag": "0004_cascade_messages_chat",
+      "breakpoints": true
     }
   ]
 }
