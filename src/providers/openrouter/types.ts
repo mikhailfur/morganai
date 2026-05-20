@@ -13,6 +13,7 @@ export interface OpenRouterMessage {
 export interface ChatCompletionParams {
   messages: OpenRouterMessage[];
   tier: 'free' | 'premium';
+  hasImages?: boolean;
   maxTokens?: number;
 }
 

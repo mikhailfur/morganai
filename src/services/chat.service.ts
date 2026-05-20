@@ -78,6 +78,7 @@ export class ChatService {
     const result = await chatCompletion({
       messages,
       tier: user.tier as 'free' | 'premium',
+      hasImages: mediaType === 'image',
     });
 
     // Sentinel response means the model detected NSFW content

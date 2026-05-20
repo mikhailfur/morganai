@@ -7,6 +7,8 @@ const envSchema = z.object({
   OPENROUTER_FREE_PRIMARY_MODEL: z.string().default('meta-llama/llama-3.1-70b-instruct:free'),
   OPENROUTER_FREE_FALLBACK_MODEL: z.string().default('google/gemma-2-9b-it:free'),
   OPENROUTER_PREMIUM_MODEL: z.string().default('deepseek/deepseek-chat'),
+  OPENROUTER_FREE_VISION_MODEL: z.string().default('meta-llama/llama-3.2-11b-vision-instruct:free'),
+  OPENROUTER_PREMIUM_VISION_MODEL: z.string().default('google/gemini-flash-1.5'),
   OPENROUTER_WHISPER_MODEL: z.string().default('openai/whisper-1'),
   OPENROUTER_NAMING_MODEL: z.string().default('meta-llama/llama-3.1-8b-instruct:free'),
   OPENROUTER_SITE_URL: z.string().default('https://t.me/morganai_bot'),

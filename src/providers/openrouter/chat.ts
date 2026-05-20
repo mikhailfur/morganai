@@ -19,7 +19,7 @@ const logger = pino({ name: 'openrouter-chat' });
 export async function chatCompletion(
   params: ChatCompletionParams,
 ): Promise<ChatCompletionResult> {
-  const models = getModelsForTier(params.tier);
+  const models = getModelsForTier(params.tier, params.hasImages);
 
   for (const model of models) {
     try {
