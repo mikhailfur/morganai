@@ -108,7 +108,7 @@ export function menuCallbackHandler(
           : freeTextManual;
 
       await showScreen(ctx, {
-        imageUrl: env.PREMIUM_BANNER_IMAGE_URL || env.BANNER_IMAGE_URL || null,
+        image: 'premium',
         text,
         keyboard: buildPremiumKeyboard(isPremium),
       });
@@ -126,7 +126,7 @@ export function menuCallbackHandler(
 
       if (result === 'granted') {
         await showScreen(ctx, {
-          imageUrl: env.PREMIUM_BANNER_IMAGE_URL || env.BANNER_IMAGE_URL || null,
+          image: 'premium',
           text:
             '🎉 *Premium активирован!*\n\n' +
             '━━━━━━━━━━━━━━━\n' +
@@ -174,7 +174,7 @@ export function menuCallbackHandler(
       }
 
       await showScreen(ctx, {
-        imageUrl: env.BANNER_IMAGE_URL || null,
+        image: 'banner',
         text,
         keyboard: Markup.inlineKeyboard([
           ...(keyboard.length ? [keyboard] : []),
@@ -206,7 +206,7 @@ export function menuCallbackHandler(
       }
 
       await showScreen(ctx, {
-        imageUrl: env.BANNER_IMAGE_URL || null,
+        image: 'banner',
         text,
         keyboard: Markup.inlineKeyboard([
           [Markup.button.callback('➕ Создать кампанию', 'referral:create')],
@@ -235,7 +235,7 @@ export function menuCallbackHandler(
         `Выбери действие:`;
 
       await showScreen(ctx, {
-        imageUrl: env.BANNER_IMAGE_URL || null,
+        image: 'banner',
         text,
         keyboard: buildMainKeyboard(isPremium, false),
       });

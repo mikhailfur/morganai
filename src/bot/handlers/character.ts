@@ -5,7 +5,6 @@ import type { UserService } from '../../services/user.service.js';
 import type { NsfwService } from '../../services/nsfw.service.js';
 import type { Character } from '../../database/schema.js';
 import { showScreen } from '../helpers/screen.js';
-import { env } from '../../config/index.js';
 
 function buildSfwKeyboard(chars: Character[]) {
   return Markup.inlineKeyboard([
@@ -59,7 +58,7 @@ export function characterCallbackHandler(
 
       if (chars.length === 0) {
         await showScreen(ctx, {
-          imageUrl: env.SFW_BANNER_IMAGE_URL || env.BANNER_IMAGE_URL || null,
+          image: 'sfw',
           text: '🎭 *Персонажи*\n\nSFW-персонажи пока не настроены.',
           keyboard: Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'menu:back')]]),
         });
@@ -67,7 +66,7 @@ export function characterCallbackHandler(
       }
 
       await showScreen(ctx, {
-        imageUrl: env.SFW_BANNER_IMAGE_URL || env.BANNER_IMAGE_URL || null,
+        image: 'sfw',
         text:
           '🎭 *Выбери персонажа*\n\n' +
           '━━━━━━━━━━━━━━━\n' +
@@ -82,7 +81,7 @@ export function characterCallbackHandler(
     if (data === 'char:tab:nsfw') {
       if (!nsfwService.hasNsfwAccess(user)) {
         await showScreen(ctx, {
-          imageUrl: env.NSFW_BANNER_IMAGE_URL || env.BANNER_IMAGE_URL || null,
+          image: 'nsfw',
           text:
             '🔞 *NSFW персонажи*\n\n' +
             '━━━━━━━━━━━━━━━\n' +
@@ -99,7 +98,7 @@ export function characterCallbackHandler(
 
       if (chars.length === 0) {
         await showScreen(ctx, {
-          imageUrl: env.NSFW_BANNER_IMAGE_URL || env.BANNER_IMAGE_URL || null,
+          image: 'nsfw',
           text: '🔞 *NSFW персонажи*\n\nNSFW-персонажи пока не добавлены.',
           keyboard: Markup.inlineKeyboard([
             [
@@ -113,7 +112,7 @@ export function characterCallbackHandler(
       }
 
       await showScreen(ctx, {
-        imageUrl: env.NSFW_BANNER_IMAGE_URL || env.BANNER_IMAGE_URL || null,
+        image: 'nsfw',
         text:
           '🔞 *NSFW персонажи*\n\n' +
           '━━━━━━━━━━━━━━━\n' +
@@ -137,11 +136,7 @@ export function characterCallbackHandler(
 
       await userService.setActiveCharacter(user.id, charId);
 
-      const imageUrl = char.avatarUrl || env.DEFAULT_AVATAR_URL || env.BANNER_IMAGE_URL || null;
-
-      const description = char.description
-        ? `\n\n${char.description}\n\n`
-        : '\n\n';
+      const description = char.description ? `\n\n${char.description}\n\n` : '\n\n';
 
       const text =
         `✅ *${char.name}*\n` +
@@ -150,7 +145,7 @@ export function characterCallbackHandler(
         `_Напиши что-нибудь, чтобы начать диалог._`;
 
       await showScreen(ctx, {
-        imageUrl,
+        image: `character:${char.slug}`,
         text,
         keyboard: Markup.inlineKeyboard([
           [Markup.button.callback('◀️ К списку персонажей', char.nsfwCapable ? 'char:tab:nsfw' : 'char:tab:sfw')],

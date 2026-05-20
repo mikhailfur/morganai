@@ -19,6 +19,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
 COPY drizzle/ ./drizzle/
+RUN mkdir -p ./image/characters
+COPY image/ ./image/
 
 EXPOSE 3000
 

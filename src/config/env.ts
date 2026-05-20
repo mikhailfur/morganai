@@ -31,11 +31,6 @@ const envSchema = z.object({
   TRIBUTE_LINK_6M: z.string().default(''),
   TRIBUTE_LINK_12M: z.string().default(''),
 
-  BANNER_IMAGE_URL: z.string().default(''),
-  SFW_BANNER_IMAGE_URL: z.string().default(''),
-  NSFW_BANNER_IMAGE_URL: z.string().default(''),
-  PREMIUM_BANNER_IMAGE_URL: z.string().default(''),
-  DEFAULT_AVATAR_URL: z.string().default(''),
 
   PORT: z.coerce.number().int().positive().default(3000),
   SERVER_URL: z.string().default(''),

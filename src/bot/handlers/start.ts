@@ -4,6 +4,7 @@ import type { NsfwService } from '../../services/nsfw.service.js';
 import type { ReferralService } from '../../services/referral.service.js';
 import type { TributeService } from '../../services/tribute.service.js';
 import { buildMainKeyboard } from './menu.js';
+import { getImage, cacheFileId, extractFileId } from '../helpers/image-cache.js';
 import { env } from '../../config/index.js';
 
 export function startHandler(
@@ -23,7 +24,7 @@ export function startHandler(
       referralService.processStartParam(startPayload, user.id).catch(() => {});
     }
 
-    // Background Tribute re-validation (fire-and-forget, non-blocking)
+    // Background Tribute re-validation (fire-and-forget)
     if (tributeService.isConfigured()) {
       tributeService.syncUserStatus(ctx.telegram, user).catch(() => {});
     }
@@ -43,12 +44,19 @@ export function startHandler(
 
     const keyboard = buildMainKeyboard(isPremium, isAdmin(user.id));
 
-    if (env.BANNER_IMAGE_URL) {
-      await ctx.replyWithPhoto(env.BANNER_IMAGE_URL, {
+    const bannerImg = getImage('banner');
+
+    if (bannerImg) {
+      const media = typeof bannerImg === 'string' ? bannerImg : (bannerImg.source as unknown as string);
+      const result = await ctx.replyWithPhoto(media, {
         caption: text,
         parse_mode: 'Markdown',
         ...keyboard,
       });
+      if (typeof bannerImg !== 'string') {
+        const fileId = extractFileId(result);
+        if (fileId) cacheFileId('banner', fileId);
+      }
     } else {
       await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
     }
