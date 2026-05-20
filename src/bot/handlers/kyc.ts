@@ -47,6 +47,7 @@ export function kycCallbackHandler(kycService: KycService) {
           },
         );
       } catch (err) {
+        console.error('[KYC] createSession failed:', err);
         await ctx.editMessageText(
           '❌ Не удалось создать сессию верификации. Попробуйте позже.',
           Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'menu:back')]]),
