@@ -53,6 +53,9 @@ export const users = pgTable('users', {
   kycNationality: varchar('kyc_nationality', { length: 3 }),
   nsfwUnlocked: boolean('nsfw_unlocked').default(false).notNull(),
   blocked: boolean('blocked').default(false).notNull(),
+  tributeVerified: boolean('tribute_verified').default(false).notNull(),
+  tributeCheckedAt: timestamp('tribute_checked_at', { withTimezone: true }),
+  premiumSource: varchar('premium_source', { length: 20 }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

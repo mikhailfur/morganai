@@ -3,10 +3,12 @@ import type { BotContext } from '../context.js';
 import type { CharacterService } from '../../services/character.service.js';
 import type { NsfwService } from '../../services/nsfw.service.js';
 import type { ReferralService } from '../../services/referral.service.js';
+import type { TributeService } from '../../services/tribute.service.js';
+import { showScreen } from '../helpers/screen.js';
 import { env } from '../../config/index.js';
 
 export function buildMainKeyboard(isPremium: boolean, isAdmin: boolean) {
-  const rows: ReturnType<typeof Markup.button.callback>[][] = [
+  const rows: (ReturnType<typeof Markup.button.callback> | ReturnType<typeof Markup.button.url>)[][] = [
     [
       Markup.button.callback('🎭 Персонажи', 'menu:characters'),
       Markup.button.callback('💬 Сессии', 'menu:sessions'),
@@ -27,92 +29,186 @@ export function buildMainKeyboard(isPremium: boolean, isAdmin: boolean) {
     rows.push([Markup.button.callback('🔐 Админ-панель', 'admin:panel')]);
   }
 
-  const extraRows: (ReturnType<typeof Markup.button.callback> | ReturnType<typeof Markup.button.url>)[][] = [...rows];
-
   if (env.TELEGRAM_CHANNEL_URL) {
-    extraRows.push([Markup.button.url('📢 Наш канал', env.TELEGRAM_CHANNEL_URL)]);
+    rows.push([Markup.button.url('📢 Наш канал', env.TELEGRAM_CHANNEL_URL)]);
   }
 
-  return Markup.inlineKeyboard(extraRows);
+  return Markup.inlineKeyboard(rows);
+}
+
+function buildPremiumKeyboard(isPremium: boolean) {
+  const tributeConfigured = !!(env.TRIBUTE_LINK_1M || env.TRIBUTE_LINK_3M);
+
+  if (isPremium) {
+    return Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'menu:back')]]);
+  }
+
+  const rows: (ReturnType<typeof Markup.button.callback> | ReturnType<typeof Markup.button.url>)[][] = [];
+
+  if (tributeConfigured) {
+    if (env.TRIBUTE_LINK_1M) rows.push([Markup.button.url('📅 1 месяц', env.TRIBUTE_LINK_1M)]);
+    if (env.TRIBUTE_LINK_3M) rows.push([Markup.button.url('📅 3 месяца', env.TRIBUTE_LINK_3M)]);
+    if (env.TRIBUTE_LINK_6M) rows.push([Markup.button.url('📅 6 месяцев', env.TRIBUTE_LINK_6M)]);
+    if (env.TRIBUTE_LINK_12M) rows.push([Markup.button.url('📅 12 месяцев', env.TRIBUTE_LINK_12M)]);
+    rows.push([Markup.button.callback('✅ Я подписался — проверить', 'menu:tribute_check')]);
+  }
+
+  rows.push([Markup.button.callback('◀️ Назад', 'menu:back')]);
+  return Markup.inlineKeyboard(rows);
 }
 
 export function menuCallbackHandler(
   characterService: CharacterService,
   nsfwService: NsfwService,
   referralService: ReferralService,
+  tributeService: TributeService,
 ) {
   return async (ctx: BotContext): Promise<void> => {
     if (!ctx.callbackQuery || !('data' in ctx.callbackQuery)) return;
     await ctx.answerCbQuery();
 
-    const action = (ctx.callbackQuery as any).data as string;
+    const action = (ctx.callbackQuery as { data: string }).data;
     const user = ctx.dbUser;
 
+    // --- Premium screen ---
     if (action === 'menu:premium') {
-      const text =
-        user.tier === 'premium'
-          ? '💎 *Premium активен*\n\nВы уже используете Premium.\n\nПреимущества:\n• Лучшие модели AI\n• Доступ к NSFW режимам (с KYC)\n• Приоритетная поддержка'
-          : '💎 *Premium подписка*\n\nОткройте доступ к:\n• Более мощным моделям AI\n• NSFW режимам (с KYC)\n• Приоритетной поддержке\n\nДля получения Premium обратитесь к администратору.';
+      const isPremium = user.tier === 'premium';
+      const tributeConfigured = !!(env.TRIBUTE_LINK_1M || env.TRIBUTE_LINK_3M);
 
-      await ctx.editMessageText(text, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'menu:back')]]),
+      const activeText =
+        '💎 *Premium активен*\n\n' +
+        '━━━━━━━━━━━━━━━\n' +
+        'Ваши преимущества:\n' +
+        '• 🤖 Мощные AI-модели\n' +
+        '• 🔞 Доступ к NSFW-контенту\n' +
+        '• ⚡ Приоритетная обработка';
+
+      const freeTextTribute =
+        '💎 *Premium подписка*\n\n' +
+        '━━━━━━━━━━━━━━━\n' +
+        'Открывает доступ к:\n' +
+        '• 🤖 Мощным AI-моделям\n' +
+        '• 🔞 NSFW-режимам (с KYC или без)\n' +
+        '• ⚡ Приоритетной обработке\n\n' +
+        '📋 Выберите план подписки:';
+
+      const freeTextManual =
+        '💎 *Premium подписка*\n\n' +
+        '━━━━━━━━━━━━━━━\n' +
+        'Открывает доступ к:\n' +
+        '• 🤖 Мощным AI-моделям\n' +
+        '• 🔞 NSFW-режимам (с KYC)\n' +
+        '• ⚡ Приоритетной обработке\n\n' +
+        '_Для получения Premium обратитесь к администратору._';
+
+      const text = isPremium
+        ? activeText
+        : tributeConfigured
+          ? freeTextTribute
+          : freeTextManual;
+
+      await showScreen(ctx, {
+        imageUrl: env.PREMIUM_BANNER_IMAGE_URL || env.BANNER_IMAGE_URL || null,
+        text,
+        keyboard: buildPremiumKeyboard(isPremium),
       });
       return;
     }
 
+    // --- Tribute check ---
+    if (action === 'menu:tribute_check') {
+      if (!tributeService.isConfigured()) {
+        await ctx.answerCbQuery('Подписка через канал не настроена', { show_alert: true });
+        return;
+      }
+
+      const result = await tributeService.grantPremium(ctx.telegram, user);
+
+      if (result === 'granted') {
+        await showScreen(ctx, {
+          imageUrl: env.PREMIUM_BANNER_IMAGE_URL || env.BANNER_IMAGE_URL || null,
+          text:
+            '🎉 *Premium активирован!*\n\n' +
+            '━━━━━━━━━━━━━━━\n' +
+            'Добро пожаловать в Premium!\n\n' +
+            '• 🤖 Мощные AI-модели — активны\n' +
+            '• 🔞 NSFW-контент — доступен\n' +
+            '• ⚡ Приоритетная обработка — активна',
+          keyboard: Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад в меню', 'menu:back')]]),
+        });
+      } else {
+        await ctx.answerCbQuery(
+          '❌ Подписка не найдена. Оформите её по ссылке выше и нажмите "Проверить" снова.',
+          { show_alert: true },
+        );
+      }
+      return;
+    }
+
+    // --- Settings screen ---
     if (action === 'menu:settings') {
       const kycStatus = user.kycVerified
-        ? '✅ KYC пройден'
+        ? '✅ пройдена'
         : nsfwService.isConfigured()
-          ? '❌ KYC не пройден'
-          : '⚠️ KYC недоступен';
+          ? '❌ не пройдена'
+          : '⚠️ недоступна';
 
-      const nsfwStatus = nsfwService.hasNsfwAccess(user)
-        ? '✅ NSFW доступен'
-        : '🔒 NSFW заблокирован';
+      const nsfwStatus = nsfwService.hasNsfwAccess(user) ? '✅ доступен' : '🔒 заблокирован';
+
+      const tierLabel = user.tier === 'premium'
+        ? '💎 Premium' + (user.premiumSource === 'tribute' ? ' (Tribute)' : '')
+        : '🆓 Free';
 
       const text =
-        `⚙️ *Настройки*\n\n` +
-        `👤 Аккаунт: ${user.tier === 'premium' ? '💎 Premium' : '🆓 Free'}\n` +
+        '⚙️ *Настройки аккаунта*\n\n' +
+        '━━━━━━━━━━━━━━━\n' +
+        `👤 Тариф: ${tierLabel}\n` +
         `🪪 Верификация: ${kycStatus}\n` +
-        `🔞 Контент: ${nsfwStatus}\n\n` +
-        `Для выбора персонажа и смены режима → «Персонажи» и «Сессии».`;
+        `🔞 NSFW-контент: ${nsfwStatus}\n` +
+        '━━━━━━━━━━━━━━━\n\n' +
+        '_Для выбора персонажа и смены режима → «Персонажи» и «Сессии»._';
 
-      const keyboard = [];
+      const keyboard: (ReturnType<typeof Markup.button.callback>)[] = [];
       if (!user.kycVerified) {
-        keyboard.push([Markup.button.callback('🪪 Пройти KYC верификацию', 'kyc:start')]);
+        keyboard.push(Markup.button.callback('🪪 Пройти KYC верификацию', 'kyc:start'));
       }
-      keyboard.push([Markup.button.callback('◀️ Назад', 'menu:back')]);
 
-      await ctx.editMessageText(text, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(keyboard),
+      await showScreen(ctx, {
+        imageUrl: env.BANNER_IMAGE_URL || null,
+        text,
+        keyboard: Markup.inlineKeyboard([
+          ...(keyboard.length ? [keyboard] : []),
+          [Markup.button.callback('◀️ Назад', 'menu:back')],
+        ]),
       });
       return;
     }
 
+    // --- Referrals screen ---
     if (action === 'menu:referrals') {
       const code = await referralService.ensureUserCode(user.id);
       const link = referralService.getBotLink(code);
       const clicks = await referralService.getUserClickCount(user.id);
       const userLinks = await referralService.listUserLinks(user.id);
 
-      let text = `🔗 *Реферальная программа*\n\n`;
-      text += `Ваша ссылка:\n\`${link}\`\n\n`;
-      text += `👥 Перешли по ссылке: *${clicks}*\n\n`;
+      let text =
+        '🔗 *Реферальная программа*\n\n' +
+        '━━━━━━━━━━━━━━━\n' +
+        'Ваша ссылка:\n' +
+        `\`${link}\`\n\n` +
+        `👥 Переходов по ссылке: *${clicks}*\n`;
 
       if (userLinks.length > 0) {
-        text += `📊 *Ваши кампании:*\n`;
+        text += '\n📊 *Ваши кампании:*\n';
         for (const l of userLinks) {
           text += `• ${l.name}: *${l.clicks}* переходов\n`;
         }
-        text += '\n';
       }
 
-      await ctx.editMessageText(text, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
+      await showScreen(ctx, {
+        imageUrl: env.BANNER_IMAGE_URL || null,
+        text,
+        keyboard: Markup.inlineKeyboard([
           [Markup.button.callback('➕ Создать кампанию', 'referral:create')],
           [Markup.button.callback('◀️ Назад', 'menu:back')],
         ]),
@@ -120,15 +216,29 @@ export function menuCallbackHandler(
       return;
     }
 
+    // --- Back to main menu ---
     if (action === 'menu:back') {
       const isPremium = user.tier === 'premium';
       const name = ctx.from?.first_name ?? 'друг';
-      const text = `👋 Привет, *${name}*!\n\nВыбери действие:`;
-      await ctx.editMessageText(text, {
-        parse_mode: 'Markdown',
-        ...buildMainKeyboard(isPremium, false),
+
+      const statusLine = isPremium
+        ? '💎 Premium активна'
+        : user.kycVerified
+          ? '🆓 Free · ✅ KYC'
+          : '🆓 Free';
+
+      const text =
+        `👋 Привет, *${name}*!\n\n` +
+        `━━━━━━━━━━━━━━━\n` +
+        `${statusLine}\n` +
+        `━━━━━━━━━━━━━━━\n\n` +
+        `Выбери действие:`;
+
+      await showScreen(ctx, {
+        imageUrl: env.BANNER_IMAGE_URL || null,
+        text,
+        keyboard: buildMainKeyboard(isPremium, false),
       });
     }
   };
 }
-

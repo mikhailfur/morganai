@@ -15,6 +15,7 @@ import { NsfwService } from '../services/nsfw.service.js';
 import { KycService } from '../services/kyc.service.js';
 import { ReferralService } from '../services/referral.service.js';
 import { AdminService } from '../services/admin.service.js';
+import { TributeService } from '../services/tribute.service.js';
 import { ContextManager } from '../memory/context-manager.js';
 import { authMiddleware } from './middleware/auth.js';
 import { loggerMiddleware } from './middleware/logger.js';
@@ -52,6 +53,7 @@ export async function startBot(logger: pino.Logger): Promise<BotStartResult> {
   const kycService = new KycService(userRepo);
   const referralService = new ReferralService(referralRepo, userRepo);
   const adminService = new AdminService(userRepo, messageRepo, referralRepo);
+  const tributeService = new TributeService(userRepo);
   const contextManager = new ContextManager(messageRepo);
 
   const chatService = new ChatService(
@@ -71,15 +73,15 @@ export async function startBot(logger: pino.Logger): Promise<BotStartResult> {
   bot.use(authMiddleware(userService));
 
   // Commands
-  bot.start(startHandler(characterService, nsfwService, (id) => adminService.isAdmin(id), referralService));
+  bot.start(startHandler(characterService, nsfwService, (id) => adminService.isAdmin(id), referralService, tributeService));
   bot.command('admin', adminCommandHandler(adminService));
 
   // Inline keyboard callbacks — order matters, most specific first
-  const charCallback = characterCallbackHandler(characterService, userService);
+  const charCallback = characterCallbackHandler(characterService, userService, nsfwService);
   const sessionsCallback = sessionsCallbackHandler(sessionService, characterService, nsfwService);
   const adminCallback = adminCallbackHandler(adminService, referralService);
   const kycCallback = kycCallbackHandler(kycService);
-  const menuCallback = menuCallbackHandler(characterService, nsfwService, referralService);
+  const menuCallback = menuCallbackHandler(characterService, nsfwService, referralService, tributeService);
 
   bot.action(/^(char:|menu:characters)/, charCallback);
   bot.action(/^sessions:/, sessionsCallback);
@@ -88,7 +90,7 @@ export async function startBot(logger: pino.Logger): Promise<BotStartResult> {
   bot.action(/^kyc:/, kycCallback);
   bot.action(/^(menu:|referral:)/, async (ctx) => {
     if (!ctx.callbackQuery || !('data' in ctx.callbackQuery)) return;
-    const data = (ctx.callbackQuery as any).data as string;
+    const data = (ctx.callbackQuery as { data: string }).data;
 
     if (data === 'referral:create') {
       await ctx.answerCbQuery();

@@ -60,6 +60,20 @@ export class UserRepository {
       .where(eq(users.id, id));
   }
 
+  async updateTribute(id: number, verified: boolean, checkedAt: Date): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ tributeVerified: verified, tributeCheckedAt: checkedAt, updatedAt: new Date() })
+      .where(eq(users.id, id));
+  }
+
+  async updatePremiumSource(id: number, source: 'manual' | 'tribute' | null): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ premiumSource: source, updatedAt: new Date() })
+      .where(eq(users.id, id));
+  }
+
   async updateNsfwUnlocked(id: number, unlocked: boolean): Promise<void> {
     await this.db
       .update(users)

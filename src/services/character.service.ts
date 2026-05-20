@@ -23,4 +23,12 @@ export class CharacterService {
   async listAll(): Promise<Character[]> {
     return this.charRepo.findAll();
   }
+
+  async listSfw(): Promise<Character[]> {
+    return this.charRepo.findAllSfw();
+  }
+
+  async listNsfw(): Promise<Character[]> {
+    return this.charRepo.findAllNsfw();
+  }
 }

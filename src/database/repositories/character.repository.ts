@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import type { Db } from '../connection.js';
 import { characters, characterModes, type Character, type CharacterMode } from '../schema.js';
 
@@ -25,6 +25,20 @@ export class CharacterRepository {
 
   async findAll(): Promise<Character[]> {
     return this.db.select().from(characters).where(eq(characters.isActive, true));
+  }
+
+  async findAllSfw(): Promise<Character[]> {
+    return this.db
+      .select()
+      .from(characters)
+      .where(and(eq(characters.isActive, true), eq(characters.nsfwCapable, false)));
+  }
+
+  async findAllNsfw(): Promise<Character[]> {
+    return this.db
+      .select()
+      .from(characters)
+      .where(and(eq(characters.isActive, true), eq(characters.nsfwCapable, true)));
   }
 
   async findModesByChar(charId: number): Promise<CharacterMode[]> {

@@ -25,6 +25,18 @@ const envSchema = z.object({
   DIDIT_WORKFLOW_ID: z.string().default(''),
   DIDIT_WEBHOOK_SECRET: z.string().default(''),
 
+  TRIBUTE_CHANNEL_ID: z.string().default(''),
+  TRIBUTE_LINK_1M: z.string().default(''),
+  TRIBUTE_LINK_3M: z.string().default(''),
+  TRIBUTE_LINK_6M: z.string().default(''),
+  TRIBUTE_LINK_12M: z.string().default(''),
+
+  BANNER_IMAGE_URL: z.string().default(''),
+  SFW_BANNER_IMAGE_URL: z.string().default(''),
+  NSFW_BANNER_IMAGE_URL: z.string().default(''),
+  PREMIUM_BANNER_IMAGE_URL: z.string().default(''),
+  DEFAULT_AVATAR_URL: z.string().default(''),
+
   PORT: z.coerce.number().int().positive().default(3000),
   SERVER_URL: z.string().default(''),
 

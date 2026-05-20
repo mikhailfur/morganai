@@ -83,6 +83,7 @@ export class AdminService {
 
   async setUserTier(userId: number, tier: 'free' | 'premium'): Promise<void> {
     await this.userRepo.updateTier(userId, tier);
+    await this.userRepo.updatePremiumSource(userId, tier === 'premium' ? 'manual' : null);
   }
 
   async setUserBlocked(userId: number, blocked: boolean): Promise<void> {
