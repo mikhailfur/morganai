@@ -8,7 +8,7 @@ import type { UserRepository } from '../database/repositories/user.repository.js
 
 interface DiditSessionCreateResponse {
   session_id: string;
-  verification_url: string;
+  url: string;
   status: string;
 }
 
@@ -107,7 +107,7 @@ export class KycService {
 
     return {
       sessionId: data.session_id,
-      verificationUrl: data.verification_url,
+      verificationUrl: data.url,
     };
   }
 
