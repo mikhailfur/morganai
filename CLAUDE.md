@@ -72,8 +72,8 @@ docker-compose up            # бот + PostgreSQL
 ```
 
 После изменения `src/database/schema.ts` обязательно:
-1. `npm run db:generate` — создаёт SQL в `drizzle/`
-2. Зарегистрировать новую миграцию в `drizzle/meta/_journal.json`
+1. `npm run db:generate` — создаёт SQL в `drizzle/` и обновляет `drizzle/meta/_journal.json` автоматически
+2. Если миграция создавалась вручную (без drizzle-kit) — нужно вручную добавить запись в `drizzle/meta/_journal.json`, иначе при следующем `db:generate` drizzle пересоздаст уже применённые constraint'ы
 
 ---
 
@@ -82,12 +82,14 @@ docker-compose up            # бот + PostgreSQL
 ### Слои (зависимости строго вниз)
 
 ```
-bot/          ← Telegraf handlers + middleware. Знает о Telegram, не знает о БД напрямую.
-services/     ← Бизнес-логика. Не знает о Telegram.
-providers/    ← Внешние API (только OpenRouter).
-memory/       ← Контекстное окно (in-memory + lazy-load из БД).
-database/     ← Drizzle ORM: schema, repositories. Только SQL.
-config/       ← Zod-валидация .env. Доступен всем слоям.
+bot/handlers/   ← Telegraf callback и command handlers
+bot/helpers/    ← UI-утилиты: showScreen(), image-cache (не знают о бизнес-логике)
+bot/middleware/ ← auth, logger, error
+services/       ← Бизнес-логика. Не знает о Telegram.
+providers/      ← Внешние API (только OpenRouter).
+memory/         ← Контекстное окно (in-memory + lazy-load из БД).
+database/       ← Drizzle ORM: schema, repositories. Только SQL.
+config/         ← Zod-валидация .env. Доступен всем слоям.
 ```
 
 `bot/` → `services/` → `providers/` + `memory/` + `database/repositories/`
@@ -102,6 +104,35 @@ config/       ← Zod-валидация .env. Доступен всем сло�
 
 **Голосовое сообщение:**
 `voice.handler` → скачать OGG → `ChatService.processVoice` → `transcribeAudio` (base64+JSON в OpenRouter) → обработать как текст
+
+**Навигация по меню:**
+Все callback-хендлеры используют `showScreen(ctx, { image, text, keyboard })` из `bot/helpers/screen.ts`. Хелпер автоматически выбирает нужный Telegraf-метод в зависимости от типа текущего сообщения:
+- фото→фото: `editMessageMedia` (меняет картинку)
+- текст→текст: `editMessageText`
+- фото→текст (нет картинки для экрана): `editMessageCaption` (картинка остаётся)
+
+**Подписка через Tribute:**
+`menu:tribute_check` → `TributeService.grantPremium(telegram, user)` → `getChatMember(TRIBUTE_CHANNEL_ID, userId)` → если член канала: `updateTier('premium') + updatePremiumSource('tribute')`. При `/start` — фоновая ревалидация через `TributeService.syncUserStatus` (не чаще раза в час).
+
+### Система изображений (`image/`)
+
+Картинки для меню хранятся в папке `image/` в корне проекта. Имена файлов:
+- `banner.*` — `/start`, главное меню
+- `sfw.*` — SFW-вкладка персонажей
+- `nsfw.*` — NSFW-вкладка персонажей
+- `premium.*` — экран Premium / Tribute
+- `characters/{slug}.*` — карточка персонажа (slug из таблицы characters)
+- `characters/default.*` — заглушка для персонажей без своей картинки
+
+Поддерживаемые форматы: `.jpg`, `.jpeg`, `.png`, `.webp`. Если файла нет — экран показывается как текст. После первой отправки Telegram `file_id` кешируется в памяти (`image-cache.ts`). При рестарте бота кеш сбрасывается, файл снова загружается один раз. Подробнее: `Docs/image-system.md`.
+
+### SFW / NSFW система персонажей
+
+Персонажи делятся по флагу `nsfw_capable` в таблице `characters`. Режимы (`character_modes`) также имеют флаг `is_nsfw`.
+
+NSFW-доступ (`NsfwService.hasNsfwAccess`): `tier === 'premium'` OR `nsfw_unlocked === true`. Исключение: регион KOR (`kycNationality = 'KOR'`) блокирует NSFW даже при Premium.
+
+При попытке доступа к NSFW без прав — показывается `nsfw-paywall.ts`.
 
 ### OpenRouter — единственный AI-провайдер
 
@@ -134,15 +165,30 @@ config/       ← Zod-валидация .env. Доступен всем сло�
 ### База данных
 
 Схема в `src/database/schema.ts`. Таблицы:
-- `characters` — персонажи (slug, name, system_prompt, is_active)
-- `users` — пользователи Telegram (id = telegram user_id, tier: 'free'|'premium', active_char_id)
-- `chats` — пара user+character, UNIQUE(user_id, char_id)
+
+- `characters` — персонажи (slug, name, system_prompt, avatar_url, is_active, **nsfw_capable**)
+- `character_modes` — режимы персонажа (name, prompt_addon, **is_nsfw**, is_default, sort_order)
+- `users` — пользователи Telegram:
+  - `id` = telegram user_id
+  - `tier`: `'free'` | `'premium'`
+  - `premium_source`: `'manual'` | `'tribute'` | null
+  - `kyc_verified`, `nsfw_unlocked` — KYC верификация
+  - `tribute_verified`, `tribute_checked_at` — членство в Tribute-канале
+  - `blocked`, `referral_code`, `referral_source`
+- `chats` — сессия user+character (active_mode_id → character_modes)
 - `messages` — история с метриками (model_used, tokens_*, cache_read)
+- `referral_links`, `referral_clicks` — реферальная система
 
 ### Конфигурация
 
 `src/config/env.ts` — Zod-схема всех переменных. При невалидных vars — `process.exit(1)` до старта бота.
-Пример: `.env.example`. Обязательные: `TELEGRAM_BOT_TOKEN`, `OPENROUTER_API_KEY`, `DATABASE_URL`.
+
+Обязательные: `TELEGRAM_BOT_TOKEN`, `OPENROUTER_API_KEY`, `DATABASE_URL`.
+
+Опциональные группы:
+- `DIDIT_*` — KYC верификация (если не задан — KYC недоступен)
+- `TRIBUTE_CHANNEL_ID`, `TRIBUTE_LINK_1M/3M/6M/12M` — Tribute подписка (если не задан — Tribute-кнопки не показываются). Подробнее: `Docs/tribute-setup.md`
+- `ADMIN_IDS` — comma-separated Telegram IDs администраторов
 
 ---
 
@@ -164,3 +210,13 @@ config/       ← Zod-валидация .env. Доступен всем сло�
 - CI/CD: `.github/workflows/deploy.yml` — push в `dev` → build → push to ghcr.io → Dokploy webhook
 - Dokploy applicationId: `tjRfvc34UyEn45wy5z0mC` (проект morgan-ai)
 - Гайд по первоначальной настройке: `Docs/dokploy-setup.md`
+
+### Внутренняя документация (`Docs/`)
+
+- `Docs/image-system.md` — система локальных картинок меню
+- `Docs/tribute-setup.md` — настройка подписки через Tribute
+- `Docs/sfw-nsfw-system.md` — система SFW/NSFW персонажей и доступа
+- `Docs/changelog.md` — история изменений
+- `Docs/nsfw-kyc-guide.md` — KYC верификация через Didit
+- `Docs/characters-module-guide.md` — добавление и настройка персонажей
+- `Docs/dokploy-setup.md` — первоначальная настройка деплоя
