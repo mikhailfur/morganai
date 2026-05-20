@@ -6,12 +6,6 @@ import type { UserRepository } from '../database/repositories/user.repository.js
 // Didit API types
 // ---------------------------------------------------------------------------
 
-interface DiditTokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
-}
-
 interface DiditSessionCreateResponse {
   session_id: string;
   verification_url: string;
@@ -59,8 +53,6 @@ export interface WebhookProcessResult {
 }
 
 const BLOCKED_REGIONS = ['KOR'];
-const DIDIT_AUTH_URL =
-  'https://auth.didit.me/auth/realms/didit/protocol/openid-connect/token';
 const DIDIT_API_BASE = 'https://verification.didit.me';
 
 // ---------------------------------------------------------------------------
@@ -84,57 +76,19 @@ function canonicalJson(value: unknown): string {
 // ---------------------------------------------------------------------------
 
 export class KycService {
-  private tokenCache: { token: string; expiresAt: number } | null = null;
-
   constructor(private userRepo: UserRepository) {}
-
-  // ── Auth ────────────────────────────────────────────────────────────────
-
-  private async getAccessToken(): Promise<string> {
-    const now = Date.now();
-    if (this.tokenCache && this.tokenCache.expiresAt > now + 60_000) {
-      return this.tokenCache.token;
-    }
-
-    const credentials = Buffer.from(
-      `${env.DIDIT_CLIENT_ID}:${env.DIDIT_CLIENT_SECRET}`,
-    ).toString('base64');
-
-    const response = await fetch(DIDIT_AUTH_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: 'grant_type=client_credentials',
-    });
-
-    if (!response.ok) {
-      throw new Error(`Didit auth failed: ${response.status} ${await response.text()}`);
-    }
-
-    const data = (await response.json()) as DiditTokenResponse;
-    this.tokenCache = {
-      token: data.access_token,
-      expiresAt: now + data.expires_in * 1000,
-    };
-    return this.tokenCache.token;
-  }
 
   // ── Session creation ────────────────────────────────────────────────────
 
   async createSession(userId: number): Promise<{ sessionId: string; verificationUrl: string }> {
-    const token = await this.getAccessToken();
-
     const response = await fetch(`${DIDIT_API_BASE}/v3/session/`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        'x-api-key': env.DIDIT_API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         workflow_id: env.DIDIT_WORKFLOW_ID,
-        // vendor_data stores userId so we can recover it even without DB lookup
         vendor_data: String(userId),
       }),
     });
@@ -161,9 +115,8 @@ export class KycService {
 
   async retrieveSession(sessionId: string): Promise<DiditSessionFull | null> {
     try {
-      const token = await this.getAccessToken();
       const response = await fetch(`${DIDIT_API_BASE}/v3/session/${sessionId}/`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 'x-api-key': env.DIDIT_API_KEY },
       });
       if (!response.ok) return null;
       return (await response.json()) as DiditSessionFull;
@@ -270,6 +223,6 @@ export class KycService {
   // ── Helpers ─────────────────────────────────────────────────────────────
 
   isConfigured(): boolean {
-    return !!(env.DIDIT_CLIENT_ID && env.DIDIT_CLIENT_SECRET && env.DIDIT_WORKFLOW_ID);
+    return !!(env.DIDIT_API_KEY && env.DIDIT_WORKFLOW_ID);
   }
 }

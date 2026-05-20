@@ -19,8 +19,7 @@ const envSchema = z.object({
   TELEGRAM_CHANNEL_URL: z.string().default(''),
   FEEDBACK_URL: z.string().default(''),
 
-  DIDIT_CLIENT_ID: z.string().default(''),
-  DIDIT_CLIENT_SECRET: z.string().default(''),
+  DIDIT_API_KEY: z.string().default(''),
   DIDIT_WORKFLOW_ID: z.string().default(''),
   DIDIT_WEBHOOK_SECRET: z.string().default(''),
 
