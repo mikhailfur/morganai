@@ -5,6 +5,7 @@ import type { ReferralService } from '../../services/referral.service.js';
 import type { TributeService } from '../../services/tribute.service.js';
 import { buildMainKeyboard } from './menu.js';
 import { getImage, cacheFileId, extractFileId } from '../helpers/image-cache.js';
+import { randomGreeting } from '../helpers/greetings.js';
 import { env } from '../../config/index.js';
 
 export function startHandler(
@@ -29,17 +30,9 @@ export function startHandler(
       tributeService.syncUserStatus(ctx.telegram, user).catch(() => {});
     }
 
-    const statusLine = isPremium
-      ? '✨ Premium-подписчик'
-      : user.kycVerified
-        ? '🆓 Бесплатный · 🪪 KYC пройден'
-        : '🆓 Бесплатный доступ';
-
     const text =
-      `🌟 *Привет, ${name}!*\n\n` +
-      `${statusLine}\n\n` +
-      `Добро пожаловать в мир AI-компаньонов 🤖\n` +
-      `С кем пообщаемся сегодня?`;
+      `*${name}*, привет 👋\n\n` +
+      `_«${randomGreeting()}»_`;
 
     const keyboard = buildMainKeyboard(isPremium, isAdmin(user.id));
 

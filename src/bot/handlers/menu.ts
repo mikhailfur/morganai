@@ -5,6 +5,7 @@ import type { NsfwService } from '../../services/nsfw.service.js';
 import type { ReferralService } from '../../services/referral.service.js';
 import type { TributeService } from '../../services/tribute.service.js';
 import { showScreen } from '../helpers/screen.js';
+import { randomGreeting } from '../helpers/greetings.js';
 import { env } from '../../config/index.js';
 
 export function buildMainKeyboard(isPremium: boolean, isAdmin: boolean) {
@@ -221,17 +222,9 @@ export function menuCallbackHandler(
       const isPremium = user.tier === 'premium';
       const name = ctx.from?.first_name ?? 'друг';
 
-      const statusLine = isPremium
-        ? '✨ Premium-подписчик'
-        : user.kycVerified
-          ? '🆓 Бесплатный · 🪪 KYC пройден'
-          : '🆓 Бесплатный доступ';
-
       const text =
-        `🌟 *Привет, ${name}!*\n\n` +
-        `${statusLine}\n\n` +
-        `Твои AI-компаньоны ждут тебя 🤖\n` +
-        `С кем пообщаемся сегодня?`;
+        `*${name}*, привет 👋\n\n` +
+        `_«${randomGreeting()}»_`;
 
       await showScreen(ctx, {
         image: 'banner',
