@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1779129490903,
+      "tag": "0000_wakeful_ultimatum",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779129491000,
+      "tag": "0001_seed_morgan_character",
+      "breakpoints": false
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779209004046,
+      "tag": "0002_yellow_viper",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779211301653,
+      "tag": "0003_new_cargill",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1748736000000,
+      "tag": "0004_cascade_messages_chat",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779304649136,
+      "tag": "0005_foamy_namorita",
+      "breakpoints": true
+    }
+  ]
+}
