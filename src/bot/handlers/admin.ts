@@ -2,6 +2,8 @@ import { Markup } from 'telegraf';
 import type { BotContext } from '../context.js';
 import type { AdminService } from '../../services/admin.service.js';
 import type { ReferralService } from '../../services/referral.service.js';
+import { showScreen } from '../helpers/screen.js';
+import { getImage, cacheFileId, extractFileId } from '../helpers/image-cache.js';
 
 function esc(text: string | null | undefined): string {
   if (!text) return '';
@@ -66,32 +68,44 @@ export function adminCallbackHandler(adminService: AdminService, referralService
     if (data.startsWith('admin:setpremium:')) {
       const targetId = parseInt(data.replace('admin:setpremium:', ''), 10);
       await adminService.setUserTier(targetId, 'premium');
-      await ctx.editMessageText(`✅ Пользователь ${targetId} переведён на Premium.`,
-        Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:users')]]));
+      await showScreen(ctx, {
+        image: 'banner',
+        text: `✅ Пользователь \`${targetId}\` переведён на Premium.`,
+        keyboard: Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:users')]]),
+      });
       return;
     }
 
     if (data.startsWith('admin:setfree:')) {
       const targetId = parseInt(data.replace('admin:setfree:', ''), 10);
       await adminService.setUserTier(targetId, 'free');
-      await ctx.editMessageText(`✅ Пользователь ${targetId} переведён на Free.`,
-        Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:users')]]));
+      await showScreen(ctx, {
+        image: 'banner',
+        text: `✅ Пользователь \`${targetId}\` переведён на Free.`,
+        keyboard: Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:users')]]),
+      });
       return;
     }
 
     if (data.startsWith('admin:block:')) {
       const targetId = parseInt(data.replace('admin:block:', ''), 10);
       await adminService.setUserBlocked(targetId, true);
-      await ctx.editMessageText(`🚫 Пользователь ${targetId} заблокирован.`,
-        Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:users')]]));
+      await showScreen(ctx, {
+        image: 'banner',
+        text: `🚫 Пользователь \`${targetId}\` заблокирован.`,
+        keyboard: Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:users')]]),
+      });
       return;
     }
 
     if (data.startsWith('admin:unblock:')) {
       const targetId = parseInt(data.replace('admin:unblock:', ''), 10);
       await adminService.setUserBlocked(targetId, false);
-      await ctx.editMessageText(`✅ Пользователь ${targetId} разблокирован.`,
-        Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:users')]]));
+      await showScreen(ctx, {
+        image: 'banner',
+        text: `✅ Пользователь \`${targetId}\` разблокирован.`,
+        keyboard: Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:users')]]),
+      });
       return;
     }
 
@@ -129,7 +143,7 @@ async function showAdminPanel(ctx: BotContext, adminService: AdminService): Prom
     }
   }
 
-  const keyboard = [
+  const keyboard = Markup.inlineKeyboard([
     [
       Markup.button.callback('📊 Статистика', 'admin:stats'),
       Markup.button.callback('💰 Расходы', 'admin:spending'),
@@ -139,10 +153,23 @@ async function showAdminPanel(ctx: BotContext, adminService: AdminService): Prom
       Markup.button.callback('📋 Логи', 'admin:logs'),
     ],
     [Markup.button.callback('🔗 Реферальные ссылки', 'admin:referrals')],
-  ];
+  ]);
 
-  const method = ctx.callbackQuery ? 'editMessageText' : 'reply';
-  await (ctx as any)[method](text, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(keyboard) });
+  if (ctx.callbackQuery) {
+    await showScreen(ctx, { image: 'banner', text, keyboard });
+  } else {
+    const img = getImage('banner');
+    if (img) {
+      const media = typeof img === 'string' ? img : { source: img.source };
+      const result = await ctx.replyWithPhoto(media as string, { caption: text, parse_mode: 'Markdown', ...keyboard });
+      if (typeof img !== 'string') {
+        const fileId = extractFileId(result);
+        if (fileId) cacheFileId('banner', fileId);
+      }
+    } else {
+      await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
+    }
+  }
 }
 
 async function showStats(ctx: BotContext, adminService: AdminService): Promise<void> {
@@ -159,9 +186,10 @@ async function showStats(ctx: BotContext, adminService: AdminService): Promise<v
   text += `  Completion: ${tokens.totalCompletion.toLocaleString()}\n`;
   text += `  Cache Read: ${tokens.totalCacheRead.toLocaleString()}\n`;
 
-  await ctx.editMessageText(text, {
-    parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:panel')]]),
+  await showScreen(ctx, {
+    image: 'banner',
+    text,
+    keyboard: Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:panel')]]),
   });
 }
 
@@ -194,9 +222,10 @@ async function showSpending(ctx: BotContext, adminService: AdminService): Promis
     text += '⚠️ Не удалось получить данные расходов.\nПроверьте OPENROUTER\\_API\\_KEY.';
   }
 
-  await ctx.editMessageText(text, {
-    parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:panel')]]),
+  await showScreen(ctx, {
+    image: 'banner',
+    text,
+    keyboard: Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:panel')]]),
   });
 }
 
@@ -214,9 +243,10 @@ async function showLogs(ctx: BotContext, adminService: AdminService): Promise<vo
 
   if (logs.length === 0) text += 'Нет сообщений.';
 
-  await ctx.editMessageText(text, {
-    parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:panel')]]),
+  await showScreen(ctx, {
+    image: 'banner',
+    text,
+    keyboard: Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:panel')]]),
   });
 }
 
@@ -263,9 +293,10 @@ async function showUsers(ctx: BotContext, adminService: AdminService, page: numb
 
   keyboard.push([Markup.button.callback('◀️ Назад', 'admin:panel')]);
 
-  await ctx.editMessageText(text, {
-    parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard(keyboard),
+  await showScreen(ctx, {
+    image: 'banner',
+    text,
+    keyboard: Markup.inlineKeyboard(keyboard),
   });
 }
 
@@ -274,8 +305,11 @@ async function showUserActions(ctx: BotContext, adminService: AdminService, targ
   const u = users.find((u) => u.id === targetId);
 
   if (!u) {
-    await ctx.editMessageText('Пользователь не найден.',
-      Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:users')]]));
+    await showScreen(ctx, {
+      image: 'banner',
+      text: 'Пользователь не найден.',
+      keyboard: Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:users')]]),
+    });
     return;
   }
 
@@ -298,9 +332,10 @@ async function showUserActions(ctx: BotContext, adminService: AdminService, targ
     [Markup.button.callback('◀️ Назад', 'admin:users')],
   ];
 
-  await ctx.editMessageText(text, {
-    parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard(keyboard),
+  await showScreen(ctx, {
+    image: 'banner',
+    text,
+    keyboard: Markup.inlineKeyboard(keyboard),
   });
 }
 
@@ -320,8 +355,9 @@ async function showReferrals(ctx: BotContext, referralService: ReferralService):
     }
   }
 
-  await ctx.editMessageText(text, {
-    parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:panel')]]),
+  await showScreen(ctx, {
+    image: 'banner',
+    text,
+    keyboard: Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'admin:panel')]]),
   });
 }
