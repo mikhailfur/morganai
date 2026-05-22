@@ -30,17 +30,16 @@ export function startHandler(
     }
 
     const statusLine = isPremium
-      ? '💎 Premium активна'
+      ? '✨ Premium-подписчик'
       : user.kycVerified
-        ? '🆓 Free · ✅ KYC'
-        : '🆓 Free';
+        ? '🆓 Бесплатный · 🪪 KYC пройден'
+        : '🆓 Бесплатный доступ';
 
     const text =
-      `👋 Привет, *${name}*!\n\n` +
-      `━━━━━━━━━━━━━━━\n` +
-      `${statusLine}\n` +
-      `━━━━━━━━━━━━━━━\n\n` +
-      `Выбери действие:`;
+      `🌟 *Привет, ${name}!*\n\n` +
+      `${statusLine}\n\n` +
+      `Добро пожаловать в мир AI-компаньонов 🤖\n` +
+      `С кем пообщаемся сегодня?`;
 
     const keyboard = buildMainKeyboard(isPremium, isAdmin(user.id));
 

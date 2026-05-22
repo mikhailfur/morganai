@@ -9,10 +9,10 @@ import { showScreen } from '../helpers/screen.js';
 function buildSfwKeyboard(chars: Character[]) {
   return Markup.inlineKeyboard([
     [
-      Markup.button.callback('✅ SFW', 'char:tab:sfw'),
+      Markup.button.callback('✅ SFW — для всех', 'char:tab:sfw'),
       Markup.button.callback('🔞 NSFW', 'char:tab:nsfw'),
     ],
-    ...chars.map((c) => [Markup.button.callback(`🎭 ${c.name}`, `char:${c.id}`)]),
+    ...chars.map((c) => [Markup.button.callback(`💬 ${c.name}`, `char:${c.id}`)]),
     [Markup.button.callback('◀️ Назад', 'menu:back')],
   ]);
 }
@@ -23,7 +23,7 @@ function buildNsfwKeyboard(chars: Character[]) {
       Markup.button.callback('📗 SFW', 'char:tab:sfw'),
       Markup.button.callback('✅ 🔞 NSFW', 'char:tab:nsfw'),
     ],
-    ...chars.map((c) => [Markup.button.callback(`🔞 ${c.name}`, `char:${c.id}`)]),
+    ...chars.map((c) => [Markup.button.callback(`🔥 ${c.name}`, `char:${c.id}`)]),
     [Markup.button.callback('◀️ Назад', 'menu:back')],
   ]);
 }
@@ -32,10 +32,10 @@ function buildNsfwLockedKeyboard() {
   return Markup.inlineKeyboard([
     [
       Markup.button.callback('📗 SFW', 'char:tab:sfw'),
-      Markup.button.callback('✅ 🔞 NSFW', 'char:tab:nsfw'),
+      Markup.button.callback('🔞 NSFW', 'char:tab:nsfw'),
     ],
     [Markup.button.callback('💎 Получить Premium', 'menu:premium')],
-    [Markup.button.callback('🪪 Пройти KYC верификацию', 'kyc:start')],
+    [Markup.button.callback('🪪 Пройти верификацию (KYC)', 'kyc:start')],
     [Markup.button.callback('◀️ Назад', 'menu:back')],
   ]);
 }
@@ -69,9 +69,9 @@ export function characterCallbackHandler(
         image: 'sfw',
         text:
           '🎭 *Выбери персонажа*\n\n' +
-          '━━━━━━━━━━━━━━━\n' +
-          '📗 *SFW* — для всех пользователей\n' +
-          '🔞 *NSFW* — требует Premium или KYC',
+          '📗 *SFW* — доступно всем\n' +
+          '🔞 *NSFW* — Premium или KYC\n\n' +
+          'С кем пообщаемся сегодня? 👇',
         keyboard: buildSfwKeyboard(chars),
       });
       return;
@@ -84,11 +84,11 @@ export function characterCallbackHandler(
           image: 'nsfw',
           text:
             '🔞 *NSFW персонажи*\n\n' +
-            '━━━━━━━━━━━━━━━\n' +
-            'Для доступа к 18+ контенту необходимо:\n\n' +
-            '💎 Оформить *Premium подписку*\n' +
-            '_или_\n' +
-            '🪪 Пройти *KYC-верификацию* личности',
+            'Эксклюзивный 18+ контент\n' +
+            'доступен для:\n\n' +
+            '💎 *Premium*-подписчиков\n' +
+            '🪪 Прошедших *KYC*-верификацию\n\n' +
+            'Разблокируй доступ уже сейчас 👇',
           keyboard: buildNsfwLockedKeyboard(),
         });
         return;
@@ -114,9 +114,9 @@ export function characterCallbackHandler(
       await showScreen(ctx, {
         image: 'nsfw',
         text:
-          '🔞 *NSFW персонажи*\n\n' +
-          '━━━━━━━━━━━━━━━\n' +
-          'Выбери персонажа для 18+ контента:',
+          '🔥 *NSFW персонажи*\n\n' +
+          'Добро пожаловать в 18+ раздел!\n\n' +
+          'Выбери персонажа для общения 👇',
         keyboard: buildNsfwKeyboard(chars),
       });
       return;
@@ -139,16 +139,16 @@ export function characterCallbackHandler(
       const description = char.description ? `\n\n${char.description}\n\n` : '\n\n';
 
       const text =
-        `✅ *${char.name}*\n` +
-        `━━━━━━━━━━━━━━━` +
+        `✨ *${char.name}* — выбран!\n` +
         description +
-        `_Напиши что-нибудь, чтобы начать диалог._`;
+        `💬 _Напиши что-нибудь, чтобы начать диалог_`;
 
       await showScreen(ctx, {
         image: `character:${char.slug}`,
         text,
         keyboard: Markup.inlineKeyboard([
-          [Markup.button.callback('◀️ К списку персонажей', char.nsfwCapable ? 'char:tab:nsfw' : 'char:tab:sfw')],
+          [Markup.button.callback('◀️ К персонажам', char.nsfwCapable ? 'char:tab:nsfw' : 'char:tab:sfw')],
+          [Markup.button.callback('🏠 Главное меню', 'menu:back')],
         ]),
       });
     }

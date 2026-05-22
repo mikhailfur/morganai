@@ -14,12 +14,12 @@ export function buildMainKeyboard(isPremium: boolean, isAdmin: boolean) {
       Markup.button.callback('💬 Сессии', 'menu:sessions'),
     ],
     [
-      Markup.button.callback('⚙️ Настройки', 'menu:settings'),
-      Markup.button.callback('🔗 Мои ссылки', 'menu:referrals'),
+      Markup.button.callback('👤 Профиль', 'menu:settings'),
+      Markup.button.callback('🎁 Пригласить', 'menu:referrals'),
     ],
     [
       Markup.button.callback(
-        isPremium ? '💎 Premium активен' : '💎 Получить Premium',
+        isPremium ? '✨ Premium — Активен' : '💎 Получить Premium',
         'menu:premium',
       ),
     ],
@@ -40,17 +40,17 @@ function buildPremiumKeyboard(isPremium: boolean) {
   const tributeConfigured = !!(env.TRIBUTE_LINK_1M || env.TRIBUTE_LINK_3M);
 
   if (isPremium) {
-    return Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад', 'menu:back')]]);
+    return Markup.inlineKeyboard([[Markup.button.callback('◀️ Вернуться', 'menu:back')]]);
   }
 
   const rows: (ReturnType<typeof Markup.button.callback> | ReturnType<typeof Markup.button.url>)[][] = [];
 
   if (tributeConfigured) {
-    if (env.TRIBUTE_LINK_1M) rows.push([Markup.button.url('📅 1 месяц', env.TRIBUTE_LINK_1M)]);
-    if (env.TRIBUTE_LINK_3M) rows.push([Markup.button.url('📅 3 месяца', env.TRIBUTE_LINK_3M)]);
-    if (env.TRIBUTE_LINK_6M) rows.push([Markup.button.url('📅 6 месяцев', env.TRIBUTE_LINK_6M)]);
-    if (env.TRIBUTE_LINK_12M) rows.push([Markup.button.url('📅 12 месяцев', env.TRIBUTE_LINK_12M)]);
-    rows.push([Markup.button.callback('✅ Я подписался — проверить', 'menu:tribute_check')]);
+    if (env.TRIBUTE_LINK_1M) rows.push([Markup.button.url('🗓 1 месяц', env.TRIBUTE_LINK_1M)]);
+    if (env.TRIBUTE_LINK_3M) rows.push([Markup.button.url('📆 3 месяца — выгода 10%', env.TRIBUTE_LINK_3M)]);
+    if (env.TRIBUTE_LINK_6M) rows.push([Markup.button.url('🔥 6 месяцев — выгода 20%', env.TRIBUTE_LINK_6M)]);
+    if (env.TRIBUTE_LINK_12M) rows.push([Markup.button.url('💰 12 месяцев — выгода 30%', env.TRIBUTE_LINK_12M)]);
+    rows.push([Markup.button.callback('✅ Уже оплатил — активировать', 'menu:tribute_check')]);
   }
 
   rows.push([Markup.button.callback('◀️ Назад', 'menu:back')]);
@@ -76,29 +76,30 @@ export function menuCallbackHandler(
       const tributeConfigured = !!(env.TRIBUTE_LINK_1M || env.TRIBUTE_LINK_3M);
 
       const activeText =
-        '💎 *Premium активен*\n\n' +
-        '━━━━━━━━━━━━━━━\n' +
-        'Ваши преимущества:\n' +
-        '• 🤖 Мощные AI-модели\n' +
-        '• 🔞 Доступ к NSFW-контенту\n' +
-        '• ⚡ Приоритетная обработка';
+        '✨ *Premium активен!*\n\n' +
+        'Ты в элите — твои привилегии:\n\n' +
+        '🤖 Топовые AI-модели — *активны*\n' +
+        '🔞 NSFW-контент — *доступен*\n' +
+        '⚡ Приоритетная обработка — *включена*\n' +
+        '🎭 Все режимы персонажей — *открыты*\n\n' +
+        '_Спасибо, что ты с нами!_ 🙏';
 
       const freeTextTribute =
         '💎 *Premium подписка*\n\n' +
-        '━━━━━━━━━━━━━━━\n' +
-        'Открывает доступ к:\n' +
-        '• 🤖 Мощным AI-моделям\n' +
-        '• 🔞 NSFW-режимам (с KYC или без)\n' +
-        '• ⚡ Приоритетной обработке\n\n' +
-        '📋 Выберите план подписки:';
+        'Разблокируй весь потенциал:\n\n' +
+        '🤖 Мощнейшие AI-модели\n' +
+        '🔞 Эксклюзивный NSFW-контент\n' +
+        '⚡ Приоритетная обработка\n' +
+        '🎭 Уникальные режимы персонажей\n\n' +
+        '👇 Выбери удобный план:';
 
       const freeTextManual =
         '💎 *Premium подписка*\n\n' +
-        '━━━━━━━━━━━━━━━\n' +
-        'Открывает доступ к:\n' +
-        '• 🤖 Мощным AI-моделям\n' +
-        '• 🔞 NSFW-режимам (с KYC)\n' +
-        '• ⚡ Приоритетной обработке\n\n' +
+        'Разблокируй весь потенциал:\n\n' +
+        '🤖 Мощнейшие AI-модели\n' +
+        '🔞 NSFW-контент (с KYC)\n' +
+        '⚡ Приоритетная обработка\n' +
+        '🎭 Уникальные режимы персонажей\n\n' +
         '_Для получения Premium обратитесь к администратору._';
 
       const text = isPremium
@@ -128,17 +129,18 @@ export function menuCallbackHandler(
         await showScreen(ctx, {
           image: 'premium',
           text:
-            '🎉 *Premium активирован!*\n\n' +
-            '━━━━━━━━━━━━━━━\n' +
-            'Добро пожаловать в Premium!\n\n' +
-            '• 🤖 Мощные AI-модели — активны\n' +
-            '• 🔞 NSFW-контент — доступен\n' +
-            '• ⚡ Приоритетная обработка — активна',
-          keyboard: Markup.inlineKeyboard([[Markup.button.callback('◀️ Назад в меню', 'menu:back')]]),
+            '🎉 *Добро пожаловать в Premium!*\n\n' +
+            'Подписка успешно активирована 🚀\n\n' +
+            '🤖 Топовые AI-модели — *активны*\n' +
+            '🔞 NSFW-контент — *доступен*\n' +
+            '⚡ Приоритет — *включён*\n' +
+            '🎭 Все режимы — *открыты*\n\n' +
+            '_Наслаждайся общением!_ ✨',
+          keyboard: Markup.inlineKeyboard([[Markup.button.callback('🏠 В главное меню', 'menu:back')]]),
         });
       } else {
         await ctx.answerCbQuery(
-          '❌ Подписка не найдена. Оформите её по ссылке выше и нажмите "Проверить" снова.',
+          '❌ Подписка не найдена. Оформи её по ссылке выше и нажми «Уже оплатил» снова.',
           { show_alert: true },
         );
       }
@@ -148,29 +150,27 @@ export function menuCallbackHandler(
     // --- Settings screen ---
     if (action === 'menu:settings') {
       const kycStatus = user.kycVerified
-        ? '✅ пройдена'
+        ? '✅ Пройдена'
         : nsfwService.isConfigured()
-          ? '❌ не пройдена'
-          : '⚠️ недоступна';
+          ? '❌ Не пройдена'
+          : '⚠️ Недоступна';
 
-      const nsfwStatus = nsfwService.hasNsfwAccess(user) ? '✅ доступен' : '🔒 заблокирован';
+      const nsfwStatus = nsfwService.hasNsfwAccess(user) ? '✅ Открыт' : '🔒 Заблокирован';
 
       const tierLabel = user.tier === 'premium'
-        ? '💎 Premium' + (user.premiumSource === 'tribute' ? ' (Tribute)' : '')
-        : '🆓 Free';
+        ? '✨ Premium' + (user.premiumSource === 'tribute' ? ' via Tribute' : '')
+        : '🆓 Бесплатный';
 
       const text =
-        '⚙️ *Настройки аккаунта*\n\n' +
-        '━━━━━━━━━━━━━━━\n' +
-        `👤 Тариф: ${tierLabel}\n` +
-        `🪪 Верификация: ${kycStatus}\n` +
-        `🔞 NSFW-контент: ${nsfwStatus}\n` +
-        '━━━━━━━━━━━━━━━\n\n' +
-        '_Для выбора персонажа и смены режима → «Персонажи» и «Сессии»._';
+        '👤 *Твой профиль*\n\n' +
+        `├ 💎 Тариф: *${tierLabel}*\n` +
+        `├ 🪪 Верификация: ${kycStatus}\n` +
+        `└ 🔞 NSFW-контент: ${nsfwStatus}\n\n` +
+        '_Меняй персонажей и режимы в разделе «Персонажи»_';
 
       const keyboard: (ReturnType<typeof Markup.button.callback>)[] = [];
-      if (!user.kycVerified) {
-        keyboard.push(Markup.button.callback('🪪 Пройти KYC верификацию', 'kyc:start'));
+      if (!user.kycVerified && nsfwService.isConfigured()) {
+        keyboard.push(Markup.button.callback('🪪 Пройти верификацию (KYC)', 'kyc:start'));
       }
 
       await showScreen(ctx, {
@@ -192,14 +192,14 @@ export function menuCallbackHandler(
       const userLinks = await referralService.listUserLinks(user.id);
 
       let text =
-        '🔗 *Реферальная программа*\n\n' +
-        '━━━━━━━━━━━━━━━\n' +
-        'Ваша ссылка:\n' +
+        '🎁 *Реферальная программа*\n\n' +
+        'Зови друзей — расти вместе!\n\n' +
+        '🔗 Твоя ссылка:\n' +
         `\`${link}\`\n\n` +
-        `👥 Переходов по ссылке: *${clicks}*\n`;
+        `👥 Друзей привлечено: *${clicks}*\n`;
 
       if (userLinks.length > 0) {
-        text += '\n📊 *Ваши кампании:*\n';
+        text += '\n📊 *Мои кампании:*\n';
         for (const l of userLinks) {
           text += `• ${l.name}: *${l.clicks}* переходов\n`;
         }
@@ -209,7 +209,7 @@ export function menuCallbackHandler(
         image: 'banner',
         text,
         keyboard: Markup.inlineKeyboard([
-          [Markup.button.callback('➕ Создать кампанию', 'referral:create')],
+          [Markup.button.callback('➕ Создать новую кампанию', 'referral:create')],
           [Markup.button.callback('◀️ Назад', 'menu:back')],
         ]),
       });
@@ -222,17 +222,16 @@ export function menuCallbackHandler(
       const name = ctx.from?.first_name ?? 'друг';
 
       const statusLine = isPremium
-        ? '💎 Premium активна'
+        ? '✨ Premium-подписчик'
         : user.kycVerified
-          ? '🆓 Free · ✅ KYC'
-          : '🆓 Free';
+          ? '🆓 Бесплатный · 🪪 KYC пройден'
+          : '🆓 Бесплатный доступ';
 
       const text =
-        `👋 Привет, *${name}*!\n\n` +
-        `━━━━━━━━━━━━━━━\n` +
-        `${statusLine}\n` +
-        `━━━━━━━━━━━━━━━\n\n` +
-        `Выбери действие:`;
+        `🌟 *Привет, ${name}!*\n\n` +
+        `${statusLine}\n\n` +
+        `Твои AI-компаньоны ждут тебя 🤖\n` +
+        `С кем пообщаемся сегодня?`;
 
       await showScreen(ctx, {
         image: 'banner',
