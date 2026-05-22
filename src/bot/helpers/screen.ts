@@ -35,11 +35,11 @@ export async function showScreen(ctx: BotContext, opts: ScreenOptions): Promise<
     }
 
     // img is either a file_id string or LocalImage { source: Buffer, key }
-    const media = typeof img === 'string' ? img : (img.source as unknown as string);
+    const media = typeof img === 'string' ? img : { source: img.source };
 
     if (onPhoto) {
       const result = await ctx.editMessageMedia(
-        { type: 'photo', media, caption: text, parse_mode: parseMode },
+        { type: 'photo', media: media as string, caption: text, parse_mode: parseMode },
         { reply_markup: keyboard.reply_markup },
       );
       if (typeof img !== 'string' && result && typeof result !== 'boolean') {
@@ -47,7 +47,7 @@ export async function showScreen(ctx: BotContext, opts: ScreenOptions): Promise<
         if (fileId) cacheFileId(img.key, fileId);
       }
     } else {
-      const result = await ctx.replyWithPhoto(media, {
+      const result = await ctx.replyWithPhoto(media as string, {
         caption: text,
         parse_mode: parseMode,
         ...keyboard,

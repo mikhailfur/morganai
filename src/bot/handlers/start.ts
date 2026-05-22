@@ -39,8 +39,8 @@ export function startHandler(
     const bannerImg = getImage('banner');
 
     if (bannerImg) {
-      const media = typeof bannerImg === 'string' ? bannerImg : (bannerImg.source as unknown as string);
-      const result = await ctx.replyWithPhoto(media, {
+      const media = typeof bannerImg === 'string' ? bannerImg : { source: bannerImg.source };
+      const result = await ctx.replyWithPhoto(media as string, {
         caption: text,
         parse_mode: 'Markdown',
         ...keyboard,
